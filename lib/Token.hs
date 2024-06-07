@@ -1,4 +1,4 @@
-module Token (tokenize) where
+module Token (tokenize, Token(..)) where
 
 import Text.Parsec
 
@@ -13,7 +13,8 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 data Token =
   Value Double |
   Operator String |
-  Bracket Char
+  OpeningBracket Char Char |
+  ClosingBracket Char
   deriving (Show)
 type Tokenizer = ParsecT String () IO
 
@@ -26,7 +27,7 @@ tokenize str = do
 
 
 token :: Tokenizer [Token]
-token = many $ spaces *> choice [rest, value, bracket, operator] <* spaces
+token = many $ spaces *> choice [rest, value, openingBracket, closingBracket, operator] <* spaces
 
 value :: Tokenizer Token
 value = do
@@ -51,12 +52,17 @@ value = do
       digits <- many1 digit
       return ('e' : sign ++ digits)
 
-brackets = oneOf "()[]{}"
-bracket :: Tokenizer Token
-bracket = Bracket <$> brackets
+openingBracket :: Tokenizer Token
+openingBracket = choice [
+  OpeningBracket ')' <$> char '(',
+  OpeningBracket ']' <$> char '[',
+  OpeningBracket '}' <$> char '}']
+
+closingBracket :: Tokenizer Token
+closingBracket = ClosingBracket <$> oneOf ")]}"
 
 operator :: Tokenizer Token
-operator = Operator <$> manyTill anyChar (lookAhead $ space <|> alphaNum <|> brackets)
+operator = Operator <$> manyTill anyChar (lookAhead $ space <|> alphaNum <|> oneOf "()[]{}")
 
 rest :: Tokenizer Token
 rest = do
