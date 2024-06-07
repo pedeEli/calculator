@@ -19,5 +19,5 @@ loop = do
     line <- liftIO getLine
     tokens <- tokenize (line ++ "\n")
     rpn <- shuntingYard tokens
-    liftIO $ print $ evaluate [] rpn
+    liftIO $ putStrLn $ evaluate [] rpn
   loop

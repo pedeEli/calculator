@@ -4,14 +4,14 @@ import Text.Parsec
 
 import Data.List (singleton)
 import Data.Functor (($>))
+import Data.Ratio (Ratio, (%))
 
 import Control.Monad (when)
 import Control.Monad.Trans.Maybe (MaybeT)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 
-
 data Token =
-  Token'Value Double |
+  Token'Value Rational |
   Token'Operator String |
   Token'OpeningBracket Char Char |
   Token'ClosingBracket Char
@@ -37,20 +37,24 @@ value = do
   when (length digits /= 1 && head digits == '0') $ unexpected "0"
 
   decimal <- option "" decimalParser
-  exponent <- option "" exponentParser
+  exponent <- option (1 % 1) exponentParser
 
-  return $ Token'Value $ read $ sign ++ digits ++ decimal ++ exponent
+  let numerator = read $ sign ++ digits ++ decimal
+      denominator = 10 ^ fromIntegral (length decimal)
+      baseNumber = numerator % denominator
+  return $ Token'Value $ baseNumber * exponent
 
   where
     decimalParser = do
       char '.'
-      digits <- many1 digit
-      return ('.' : digits)
+      many1 digit
     exponentParser = do
       e <- oneOf "eE"
       sign <- option "" (singleton <$> oneOf "+-")
       digits <- many1 digit
-      return ('e' : sign ++ digits)
+      return $ if sign == "-"
+        then 1 % (10 ^ read digits)
+        else (10 ^ read digits) % 1
 
 openingBracket :: Tokenizer Token
 openingBracket = choice [
