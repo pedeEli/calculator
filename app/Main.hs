@@ -2,6 +2,7 @@ module Main where
 
 import Token (tokenize)
 import ShuntingYard (shuntingYard)
+import RPN (evaluate)
 import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 
@@ -18,5 +19,5 @@ loop = do
     line <- liftIO getLine
     tokens <- tokenize (line ++ "\n")
     rpn <- shuntingYard tokens
-    liftIO $ print rpn
+    liftIO $ print $ evaluate [] rpn
   loop
