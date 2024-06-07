@@ -1,9 +1,15 @@
-module Expr where
+module Expr (shuntingYard) where
 
 import Token (Token(Value, OpeningBracket, ClosingBracket))
 import qualified Token (Token(Operator))
 
 import Data.List (singleton, find)
+import Data.Functor ((<&>))
+
+import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.State
+import Control.Monad.Trans.Class (MonadTrans(lift))
+import Control.Monad.IO.Class (MonadIO(liftIO))
 
 data Expr =
   Mult Expr Expr |
@@ -13,49 +19,56 @@ data Expr =
 
 
 data OperatorInfo = OperatorInfo {opType :: String, opPrecedence :: Word}
+  deriving (Show)
 
-operators :: [OperatorInfo]
-operators = [
+buildInOperators :: [OperatorInfo]
+buildInOperators = [
   OperatorInfo "+" 0,
   OperatorInfo "*" 1,
   OperatorInfo "^" 2]
 
 
 data OperatorStack = Operator OperatorInfo | Bracket Char Char
+  deriving (Show)
 
-shuntingYard :: [Token] -> [OperatorStack] -> [String]
-shuntingYard [] [] = []
-shuntingYard [] (Bracket closing _:_) = error $ "missing bracket " ++ singleton closing
-shuntingYard [] (Operator i:ops) = opType i : shuntingYard [] ops
-shuntingYard (t:ts) ops = case t of
-  Value v -> show v : shuntingYard ts ops
-  Token.Operator op -> case find (\a -> op == opType a) operators of
-    Nothing -> error $ "unknown operator " ++ op
-    Just info ->
-      let (output, rest) = popOperators info ops
-      in output ++ shuntingYard ts rest
-  OpeningBracket closing opening -> shuntingYard ts (Bracket closing opening : ops)
-  ClosingBracket b ->
-    let (output, rest) = popUntilBracket b ops
-    in output ++ shuntingYard ts rest
+shuntingYard :: [Token] -> MaybeT IO [String]
+shuntingYard tokens = evalStateT (shuntingYard' tokens) []
 
+type ShuntingYard = StateT [OperatorStack] (MaybeT IO)
 
-popOperators :: OperatorInfo -> [OperatorStack] -> ([String], [OperatorStack])
-popOperators info [] = ([], [Operator info])
-popOperators info ops@(Bracket _ _:_) = ([], Operator info : ops)
-popOperators info os@(Operator i:ops) = if opPrecedence i >= opPrecedence info
-  then
-    let (output, rest) = popOperators info ops
-    in (opType info : output, rest)
-  else ([], Operator info : os)
+shuntingYard' :: [Token] -> ShuntingYard [String]
+shuntingYard' [] = get >>= go
+  where
+    go :: [OperatorStack] -> ShuntingYard [String]
+    go [] = return []
+    go (Bracket closing _ : _) = liftIO (putStrLn $ "missing bracket " ++ [closing]) >> lift (fail "")
+    go (Operator info : rest) = go rest <&> (opType info :)
+shuntingYard' (t : ts) = case t of
+  Value v -> shuntingYard' ts <&> (show v :)
+  OpeningBracket closing opening -> modify (Bracket closing opening :) >> shuntingYard' ts
+  ClosingBracket closing -> (++) <$> popUntilBracket closing <*> shuntingYard' ts
+  Token.Operator operator -> case find (\a -> operator == opType a) buildInOperators of
+    Nothing -> liftIO (putStrLn $ "unknown operator " ++ operator) >> lift (fail "")
+    Just info -> (++) <$> popOperators info <*> shuntingYard' ts
 
 
+popOperators :: OperatorInfo -> ShuntingYard [String]
+popOperators info = get >>= go
+  where
+    go :: [OperatorStack] -> ShuntingYard [String]
+    go [] = put [Operator info] >> return []
+    go stack@(Bracket _ _ : _) = put (Operator info : stack) >> return []
+    go stack@(Operator i : rest) = if opPrecedence i < opPrecedence info
+      then put (Operator info : stack) >> return []
+      else popOperators info
 
-popUntilBracket :: Char -> [OperatorStack] -> ([String], [OperatorStack])
-popUntilBracket _ [] = error "missing bracket"
-popUntilBracket b (Operator o:ops) =
-  let (output, remaining) = popUntilBracket b ops
-  in (opType o : output, remaining)
-popUntilBracket bracket (Bracket closing _:ops) = if bracket == closing
-  then ([], ops)
-  else error $ "missmatched brackets " ++ singleton bracket ++ " and " ++ singleton closing
+
+popUntilBracket :: Char -> ShuntingYard [String]
+popUntilBracket bracket = get >>= go []
+  where
+    go :: [String] -> [OperatorStack] -> ShuntingYard [String]
+    go _ [] = liftIO (putStrLn "missing bracket") >> lift (fail "")
+    go output (Operator info : rest) = go (opType info : output) rest
+    go output (Bracket closing _ : rest) = if bracket == closing
+      then put rest >> return output
+      else liftIO (putStrLn $ "missmatched brackets " ++ [bracket] ++ " and " ++ [closing]) >> lift (fail "")

@@ -17,7 +17,6 @@ loop = do
   runMaybeT $ do
     line <- liftIO getLine
     tokens <- tokenize (line ++ "\n")
-    liftIO $ print tokens
-    let rpn = shuntingYard tokens []
+    rpn <- shuntingYard tokens
     liftIO $ print rpn
   loop
