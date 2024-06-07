@@ -29,7 +29,7 @@ shuntingYard' [] = get >>= go
     go (OperatorStackType'Bracket closing _ : _) = liftIO (putStrLn $ "missing bracket " ++ [closing]) >> lift (fail "")
     go (OperatorStackType'Operator info : rest) = go rest <&> (RPN'Operator info :)
 shuntingYard' (t : ts) = case t of
-  Token'Value v -> shuntingYard' ts <&> (RPN'Value v :)
+  Token'Value value unit -> shuntingYard' ts <&> (RPN'Value value unit :)
   Token'OpeningBracket closing opening -> modify (OperatorStackType'Bracket closing opening :) >> shuntingYard' ts
   Token'ClosingBracket closing -> (++) <$> popUntilBracket closing <*> shuntingYard' ts
   Token'Operator operator -> case find (\a -> operator == opType a) buildInOperators of

@@ -10,8 +10,10 @@ import Control.Monad (when)
 import Control.Monad.Trans.Maybe (MaybeT)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 
+import Unit (Unit, unitParser)
+
 data Token =
-  Token'Value Rational |
+  Token'Value Rational Unit |
   Token'Operator String |
   Token'OpeningBracket Char Char |
   Token'ClosingBracket Char
@@ -39,10 +41,13 @@ value = do
   decimal <- option "" decimalParser
   exponent <- option (1 % 1) exponentParser
 
+  spaces
+  unit <- unitParser
+
   let numerator = read $ sign ++ digits ++ decimal
       denominator = 10 ^ fromIntegral (length decimal)
       baseNumber = numerator % denominator
-  return $ Token'Value $ baseNumber * exponent
+  return $ Token'Value (baseNumber * exponent) unit
 
   where
     decimalParser = do

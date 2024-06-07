@@ -23,7 +23,8 @@ library
     exposed-modules: 
         Token,
         ShuntingYard,
-        RPN
+        RPN,
+        Unit
 
     -- Modules included in this library but not exported.
     -- other-modules:

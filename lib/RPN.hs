@@ -2,6 +2,8 @@ module RPN (evaluate, RPN(..), OperatorInfo(..), buildInOperators) where
 
 import Data.Ratio (Ratio, numerator, denominator)
 
+import Unit (Unit)
+
 data OperatorInfo = OperatorInfo {
   opType :: String,
   opPrecedence :: Word, 
@@ -15,19 +17,19 @@ buildInOperators = [
   OperatorInfo "/" 1 (/)]
 
 data RPN =
-  RPN'Value Rational |
+  RPN'Value Rational Unit |
   RPN'Operator OperatorInfo
 
 instance Show RPN where
-  show (RPN'Value d) = show d
+  show (RPN'Value d unit) = show d ++ show unit
   show (RPN'Operator info) = show $ opType info
 
 
-evaluate :: [Rational] -> [RPN] -> String
+evaluate :: [(Rational, Unit)] -> [RPN] -> String
 evaluate []      [] = error "not possible"
-evaluate (d : _) [] = showRational d
-evaluate (d1 : d2 : ds) (RPN'Operator info : rest) = evaluate (fun info d2 d1 : ds) rest
-evaluate ds (RPN'Value d : rest) = evaluate (d : ds) rest
+evaluate ((d, u) : _) [] = showRational d ++ show u
+evaluate ((d1, u1) : (d2, u2) : ds) (RPN'Operator info : rest) = evaluate ((fun info d2 d1, u1) : ds) rest
+evaluate ds (RPN'Value d u : rest) = evaluate ((d, u) : ds) rest
 
 
 showRational :: Rational -> String
