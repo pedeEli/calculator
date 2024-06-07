@@ -22,7 +22,8 @@ extra-source-files: CHANGELOG.md
 library
     exposed-modules: 
         Token,
-        Expr
+        ShuntingYard,
+        RPN
 
     -- Modules included in this library but not exported.
     -- other-modules:

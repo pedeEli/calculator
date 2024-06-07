@@ -1,8 +1,8 @@
 module Main where
 
 import Token (tokenize)
-import Expr (shuntingYard)
-import Control.Monad.Trans.Maybe ( MaybeT(runMaybeT) )
+import ShuntingYard (shuntingYard)
+import Control.Monad.Trans.Maybe (MaybeT(runMaybeT))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 
 main :: IO ()

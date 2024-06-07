@@ -11,10 +11,10 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 
 
 data Token =
-  Value Double |
-  Operator String |
-  OpeningBracket Char Char |
-  ClosingBracket Char
+  Token'Value Double |
+  Token'Operator String |
+  Token'OpeningBracket Char Char |
+  Token'ClosingBracket Char
   deriving (Show)
 type Tokenizer = ParsecT String () IO
 
@@ -39,7 +39,7 @@ value = do
   decimal <- option "" decimalParser
   exponent <- option "" exponentParser
 
-  return $ Value $ read $ sign ++ digits ++ decimal ++ exponent
+  return $ Token'Value $ read $ sign ++ digits ++ decimal ++ exponent
 
   where
     decimalParser = do
@@ -54,15 +54,15 @@ value = do
 
 openingBracket :: Tokenizer Token
 openingBracket = choice [
-  OpeningBracket ')' <$> char '(',
-  OpeningBracket ']' <$> char '[',
-  OpeningBracket '}' <$> char '}']
+  Token'OpeningBracket ')' <$> char '(',
+  Token'OpeningBracket ']' <$> char '[',
+  Token'OpeningBracket '}' <$> char '}']
 
 closingBracket :: Tokenizer Token
-closingBracket = ClosingBracket <$> oneOf ")]}"
+closingBracket = Token'ClosingBracket <$> oneOf ")]}"
 
 operator :: Tokenizer Token
-operator = Operator <$> manyTill anyChar (lookAhead $ space <|> alphaNum <|> oneOf "()[]{}")
+operator = Token'Operator <$> manyTill anyChar (lookAhead $ space <|> alphaNum <|> oneOf "()[]{}")
 
 rest :: Tokenizer Token
 rest = do
