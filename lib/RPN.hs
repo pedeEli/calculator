@@ -6,7 +6,9 @@ data OperatorInfo = OperatorInfo {opType :: String, opPrecedence :: Word, fun ::
 buildInOperators :: [OperatorInfo]
 buildInOperators = [
   OperatorInfo "+" 0 (+),
+  OperatorInfo "-" 0 (-),
   OperatorInfo "*" 1 (*),
+  OperatorInfo "/" 1 (/),
   OperatorInfo "^" 2 (**)]
 
 data RPN =
@@ -21,5 +23,5 @@ instance Show RPN where
 evaluate :: [Double] -> [RPN] -> Double
 evaluate []      [] = error "not possible"
 evaluate (d : _) [] = d
-evaluate (d1 : d2 : ds) (RPN'Operator info : rest) = evaluate (fun info d1 d2 : ds) rest
+evaluate (d1 : d2 : ds) (RPN'Operator info : rest) = evaluate (fun info d2 d1 : ds) rest
 evaluate ds (RPN'Value d : rest) = evaluate (d : ds) rest
