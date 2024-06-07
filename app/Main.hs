@@ -1,7 +1,8 @@
 module Main where
 
-import Text.Parsec
-import Token
+import Token (tokenize)
+import Control.Monad.Trans.Maybe ( MaybeT(runMaybeT) )
+import Control.Monad.IO.Class (MonadIO(liftIO))
 
 main :: IO ()
 main = do
@@ -12,11 +13,12 @@ main = do
 
 loop :: IO ()
 loop = do
-  line <- getLine
-  result <- runParserT tokenizer () "" line
-  case result of
-    Left err -> print err >> loop
-    Right tokens -> print tokens >> loop
+  runMaybeT $ do
+    line <- liftIO getLine
+    result <- tokenize (line ++ "\n")
+    liftIO $ print result
+  loop
+      
 
 
 
