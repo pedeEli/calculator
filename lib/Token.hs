@@ -32,7 +32,7 @@ token :: Tokenizer [Token]
 token = many $ spaces *> choice [rest, value, openingBracket, closingBracket, operator] <* spaces
 
 value :: Tokenizer Token
-value = do
+value = try $ do
   sign <- option "" (string "-")
 
   digits <- many1 digit
