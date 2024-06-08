@@ -59,7 +59,7 @@ divide u1 (Unit u2) = multiply u1 $ Unit $ map (_2 %~ negate) u2
 unitParser :: ParsecT String () IO Unit
 unitParser = option (Unit []) $ do
   n <- choice [char '1' >> return [], many1 singleUnit]
-  d <- option [] $ char '/' >> many1 singleUnit
+  d <- option [] $ try $ char '/' >> many1 singleUnit
   return $ Unit $ n ++ map (_2 %~ negate) d
 
 
