@@ -2,8 +2,8 @@
 module Utils where
 
 
-import Language.Haskell.TH hiding (conE, litE, varE, varP, conT)
-import qualified Language.Haskell.TH as TH (conE, litE, varE, varP, conT)
+import Language.Haskell.TH hiding (conE, litE, varE, varP, conT, conP)
+import qualified Language.Haskell.TH as TH (conE, litE, varE, varP, conT, conP)
 
 import Test.Tasty (TestName)
 
@@ -27,17 +27,21 @@ testCalc str f = do
 
   singleTestE $: conE "QC" $: varE "property" $: lamE args $ varE "monadicIO" $: doE [
     bindS (varP "result") $ varE "run" $: varE "calc" $: createCalc vars strings,
-    noBindS $ varE "assert" $: varE "result" ==: appE (conE "Just") (showRationalE $ apply f vars)]
+    noBindS $ caseE (varE "result") [
+      match (conP "Nothing" []) (normalB $ appE (varE "fail") $ litE "") [],
+      match (conP "Just" [conP "Result" [varP "r", varP "u"]]) (
+        normalB $ varE "assert" $: varE "r" ==: (apply f vars)
+      ) []
+    ]]
 
   where
-    showRationalE = appE (varE "showRational")
     showE = appE (varE "show")
     typed v = sigE (varE [vName v]) (conT "Double")
 
     createArg :: Variable -> PatQ
     createArg v = case vMod v of
       Nothing -> varP [vName v]
-      Just mod -> conP (mkName mod) [varP [vName v]]
+      Just mod -> conP mod [varP [vName v]]
 
     createName :: [Variable] -> [String] -> String
     createName [] bs = concat bs
@@ -65,19 +69,22 @@ infix 4 ==:
 
 
 conE :: Quote m => String -> m Exp
-conE name = TH.conE $ mkName name
+conE = TH.conE . mkName
 
 varE :: Quote m => String -> m Exp
-varE name = TH.varE $ mkName name
+varE = TH.varE . mkName
 
 litE :: Quote m => String -> m Exp
-litE name = TH.litE $ stringL name
+litE = TH.litE . stringL
 
 varP :: Quote m => String -> m Pat
-varP name = TH.varP $ mkName name
+varP = TH.varP . mkName
 
 conT :: Quote m => String -> m Type
-conT name = TH.conT $ mkName name
+conT = TH.conT . mkName
+
+conP :: Quote m => String -> [m Pat] -> m Pat
+conP = TH.conP . mkName
 
 
 convertToRational :: Double -> Rational

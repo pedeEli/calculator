@@ -1,6 +1,7 @@
 module Calc.Types where
 
 import Control.Lens
+import Data.Ratio (numerator, denominator)
 
 data Token =
   Token'Value Rational Unit |
@@ -58,3 +59,19 @@ data RPN =
 instance Show RPN where
   show (RPN'Value d unit) = show d ++ show unit
   show (RPN'Operator info) = show $ opType info
+
+
+
+data Result = Result Rational Unit
+
+instance Show Result where
+  show (Result r u) = showRational r ++ show u
+
+
+showRational :: Rational -> String
+showRational r =
+  let n = numerator r
+      d = denominator r
+  in if d == 1
+    then show n
+    else show n ++ " / " ++ show d

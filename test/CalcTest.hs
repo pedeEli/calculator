@@ -10,7 +10,7 @@ import Test.Tasty.QuickCheck (QC(QC))
 import Test.QuickCheck
 
 import Calc (calc)
-import Calc.RPN (showRational)
+import Calc.Types (showRational, Result(..))
 
 import Utils (testCalc, convertToRational)
 

@@ -1,9 +1,12 @@
 module Calc.RPN where
 
+import Control.Monad.Trans.Maybe (MaybeT)
+
 import Data.Ratio (Ratio, numerator, denominator)
 
 import Calc.Unit (multiply, divide)
-import Calc.Types (Unit, OperatorInfo(..), RPN(..))
+import Calc.Types (Unit, OperatorInfo(..), RPN(..), Result(..))
+import Control.Monad.IO.Class (MonadIO(liftIO))
 
 buildInOperators :: [OperatorInfo]
 buildInOperators = [
@@ -13,17 +16,12 @@ buildInOperators = [
   OperatorInfo "/" 1 (/) divide]
 
 
-evaluate :: [(Rational, Unit)] -> [RPN] -> String
-evaluate []      [] = error "not possible"
-evaluate ((d, u) : _) [] = showRational d ++ show u
-evaluate ((d1, u1) : (d2, u2) : ds) (RPN'Operator info : rest) = evaluate ((fun info d2 d1, fun2 info u2 u1) : ds) rest
-evaluate ds (RPN'Value d u : rest) = evaluate ((d, u) : ds) rest
-
-
-showRational :: Rational -> String
-showRational r =
-  let n = numerator r
-      d = denominator r
-  in if d == 1
-    then show n
-    else show n ++ " / " ++ show d
+evaluate :: [RPN] -> MaybeT IO Result
+evaluate = go []
+  where
+    go :: [(Rational, Unit)] -> [RPN] -> MaybeT IO Result
+    go []       [] = error "not possible"
+    go [(d, u)] [] = return $ Result d u
+    go (_ : _)  [] = liftIO (putStrLn "missing operator") >> fail ""
+    go ((d1, u1) : (d2, u2) : ds) (RPN'Operator info : rest) = go ((fun info d2 d1, fun2 info u2 u1) : ds) rest
+    go ds (RPN'Value d u : rest) = go ((d, u) : ds) rest

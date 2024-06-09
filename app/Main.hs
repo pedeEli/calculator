@@ -15,4 +15,4 @@ loop = do
   result <- calc (line ++ "\n")
   case result of
     Nothing -> loop
-    Just d -> putStrLn d >> loop
+    Just d -> print d >> loop
