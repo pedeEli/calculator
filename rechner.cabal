@@ -20,11 +20,13 @@ category:           Math
 extra-source-files: CHANGELOG.md
 
 library
-    exposed-modules: 
-        Token,
-        ShuntingYard,
-        RPN,
-        Unit
+    exposed-modules:
+        Calc,
+        Calc.Token,
+        Calc.ShuntingYard,
+        Calc.RPN,
+        Calc.Unit,
+        Calc.Types
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -60,5 +62,15 @@ test-suite rechner-test
     default-language: Haskell2010
     type:             exitcode-stdio-1.0
     hs-source-dirs:   test
-    main-is:          MyLibTest.hs
-    build-depends:    base ^>=4.16.4.0
+    main-is:          CalcTest.hs
+    build-depends:
+        base ^>=4.16.4.0,
+        tasty >= 1.5,
+        tasty-quickcheck >= 0.10.3,
+        QuickCheck >= 2.15,
+        template-haskell >= 2.18,
+        parsec >= 3.1.17.0,
+        lens >= 5.2,
+        rechner
+    other-modules:
+        Utils

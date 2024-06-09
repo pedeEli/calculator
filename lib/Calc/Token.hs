@@ -1,38 +1,40 @@
-module Token (tokenize, Token(..)) where
+module Calc.Token where
 
 import Text.Parsec
 
 import Data.List (singleton)
 import Data.Functor (($>))
+import Data.Functor.Identity (Identity)
 import Data.Ratio (Ratio, (%))
 
 import Control.Monad (when)
 import Control.Monad.Trans.Maybe (MaybeT)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 
-import Unit (Unit, unitParser)
+import Calc.Unit (unitParser)
+import Calc.Types (Token(..))
 
-data Token =
-  Token'Value Rational Unit |
-  Token'Operator String |
-  Token'OpeningBracket Char Char |
-  Token'ClosingBracket Char
-  deriving (Show)
-type Tokenizer = ParsecT String () IO
+type Tokenizer = Parsec String (Maybe Token)
 
 tokenize :: String -> MaybeT IO [Token]
 tokenize str = do
-  result <- liftIO $ runParserT Token.token () "" str
+  let result = runParser Calc.Token.tokens Nothing "" str
   case result of
     Left err -> liftIO (print err) >> fail ""
     Right tokens -> return tokens
 
+tokens :: Tokenizer [Token]
+tokens = many $ do
+  spaces
+  t <- choice [rest, value, openingBracket, closingBracket, operator]
+  spaces
+  putState $ Just t
+  return t
 
-token :: Tokenizer [Token]
-token = many $ spaces *> choice [rest, value, openingBracket, closingBracket, operator] <* spaces
-
-value :: Tokenizer Token
-value = try $ do
+number :: Tokenizer Rational
+number = do
+  lastToken <- getState
+  when (isValue lastToken) $ fail ""
   sign <- option "" (string "-")
 
   digits <- many1 digit
@@ -41,13 +43,10 @@ value = try $ do
   decimal <- option "" decimalParser
   exponent <- option (1 % 1) exponentParser
 
-  spaces
-  unit <- unitParser
-
   let numerator = read $ sign ++ digits ++ decimal
       denominator = 10 ^ fromIntegral (length decimal)
       baseNumber = numerator % denominator
-  return $ Token'Value (baseNumber * exponent) unit
+  return $ baseNumber * exponent
 
   where
     decimalParser = do
@@ -60,6 +59,12 @@ value = try $ do
       return $ if sign == "-"
         then 1 % (10 ^ read digits)
         else (10 ^ read digits) % 1
+
+value :: Tokenizer Token
+value = try $ do
+  n <- number
+  spaces
+  Token'Value n <$> unitParser
 
 openingBracket :: Tokenizer Token
 openingBracket = choice [
@@ -77,3 +82,8 @@ rest :: Tokenizer Token
 rest = do
   l <- letter
   unexpected $ singleton l
+
+
+isValue :: Maybe Token -> Bool
+isValue (Just (Token'Value _ _)) = True
+isValue _ = False

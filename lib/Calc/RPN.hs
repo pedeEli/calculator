@@ -1,14 +1,9 @@
-module RPN (evaluate, RPN(..), OperatorInfo(..), buildInOperators) where
+module Calc.RPN where
 
 import Data.Ratio (Ratio, numerator, denominator)
 
-import Unit (Unit, multiply, divide)
-
-data OperatorInfo = OperatorInfo {
-  opType :: String,
-  opPrecedence :: Word, 
-  fun :: Rational -> Rational -> Rational,
-  fun2 :: Unit -> Unit -> Unit}
+import Calc.Unit (multiply, divide)
+import Calc.Types (Unit, OperatorInfo(..), RPN(..))
 
 buildInOperators :: [OperatorInfo]
 buildInOperators = [
@@ -16,14 +11,6 @@ buildInOperators = [
   OperatorInfo "-" 0 (-) (const id),
   OperatorInfo "*" 1 (*) multiply,
   OperatorInfo "/" 1 (/) divide]
-
-data RPN =
-  RPN'Value Rational Unit |
-  RPN'Operator OperatorInfo
-
-instance Show RPN where
-  show (RPN'Value d unit) = show d ++ show unit
-  show (RPN'Operator info) = show $ opType info
 
 
 evaluate :: [(Rational, Unit)] -> [RPN] -> String

@@ -1,7 +1,7 @@
-module ShuntingYard (shuntingYard) where
+module Calc.ShuntingYard where
 
-import Token (Token(..))
-import RPN (RPN(..), OperatorInfo(..), buildInOperators)
+import Calc.RPN (buildInOperators)
+import Calc.Types (RPN(..), OperatorInfo(..), Token(..))
 
 import Data.List (singleton, find)
 import Data.Functor ((<&>))
