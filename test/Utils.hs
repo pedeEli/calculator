@@ -91,7 +91,7 @@ parseExpr :: String -> Q ([Variable], [String])
 parseExpr str = case runParser parser ([], []) "" str of
   Left err -> fail (show err)
   Right (vs, strings) -> if check vs
-    then return (reverse vs, map reverse $ reverse strings)
+    then return (reverse vs, reverse strings)
     else fail "variables do not have the same modifiers"
   where
     parser = many (choice [parseVariable, parseRest]) >> getState

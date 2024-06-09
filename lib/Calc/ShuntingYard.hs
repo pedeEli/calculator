@@ -45,7 +45,7 @@ popOperators info = get >>= go
     go stack@(OperatorStackType'Bracket _ _ : _) = put (OperatorStackType'Operator info : stack) >> return []
     go stack@(OperatorStackType'Operator i : rest) = if opPrecedence i < opPrecedence info
       then put (OperatorStackType'Operator info : stack) >> return []
-      else popOperators info
+      else go rest <&> (RPN'Operator i :)
 
 
 popUntilBracket :: Char -> ShuntingYard
