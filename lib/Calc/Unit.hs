@@ -9,10 +9,10 @@ import Control.Lens
 import Calc.Types (SIUnit(..), Unit(..), Units, Token)
 
 multiply :: Unit -> Unit -> Unit
-multiply (Unit u1) (Unit u2) = go (u1 ++ u2) []
+multiply (Unit u1) (Unit u2) = Unit $ filter ((0 /=) . snd) $ go (u1 ++ u2) []
   where
-    go :: Units -> Units -> Unit
-    go [] acc = Unit acc
+    go :: Units -> Units -> Units
+    go []            acc = acc
     go ((u, e) : us) acc = case findIndex ((== u) . fst) acc of
       Nothing -> go us ((u, e) : acc)
       Just index -> go us $ acc & ix index . _2 %~ (+e)

@@ -4,7 +4,6 @@ module Main (main) where
 
 import Test.Tasty
 import Test.Tasty.Providers (singleTest)
-import Test.Tasty.QuickCheck as QC
 import Test.QuickCheck.Monadic (monadicIO, run, assert)
 import Test.Tasty.QuickCheck (QC(QC))
 import Test.QuickCheck
