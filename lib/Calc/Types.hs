@@ -12,38 +12,50 @@ data Token =
 
 
 data SIUnit =
-  Meter |
-  Second |
-  Kilogram
+  Length |
+  Time |
+  Mass
   deriving (Eq)
 
-instance Show SIUnit where
-  show Meter = "m"
-  show Second = "s"
-  show Kilogram = "kg"
-
-
-type Units = [(SIUnit, Int)]
-showUnits :: Units -> String
-showUnits [] = ""
-showUnits ((u, e) : us)
-  | e == 1 = show u ++ showUnits us
-  | otherwise = show u ++ "^" ++ show e ++ showUnits us
-
-newtype Unit = Unit Units
+data Unit = Unit {uSIUnit :: SIUnit, uFactor :: Rational, uSymbol :: String}
+  deriving (Eq)
 instance Show Unit where
-  show (Unit us) = case splitAt0 us [] [] of
+  show = uSymbol
+
+type UnitList = [(Unit, Int)]
+
+data UnitComp = UnitComp {ucSIUnits :: UnitList, ucSymbol :: Maybe (String, Int)}
+
+unitComp :: Unit -> UnitComp
+unitComp unit = UnitComp {ucSIUnits = [(unit, 1)], ucSymbol = Nothing}
+
+
+instance Show UnitComp where
+  show (UnitComp _ (Just (s, e)))
+    | e == 1    = s
+    | e > 1     = s ++ "^" ++ show e
+    | e == -1   = "1/" ++ s
+    | otherwise = "1/" ++ s ++ "^" ++ show (-e)
+  show (UnitComp us _) = case splitAt0 us [] [] of
     ([] , [])  -> ""
-    (pos, [])  -> showUnits pos
-    ([] , neg) -> "1/" ++ showUnits neg
-    (pos, neg) -> showUnits pos ++ "/" ++ showUnits (map (_2 %~ negate) neg)
+    (pos, [])  -> go pos
+    ([] , neg) -> "1/" ++ go neg
+    (pos, neg) -> go pos ++ "/" ++ go (map (_2 %~ negate) neg)
+    where
+      go :: UnitList -> String
+      go [] = ""
+      go ((u, e) : us)
+        | e == 1 = show u ++ go us
+        | otherwise = show u ++ "^" ++ show e ++ go us
 
 
-splitAt0 :: Units -> Units -> Units -> (Units, Units)
+splitAt0 :: UnitList -> UnitList -> UnitList -> (UnitList, UnitList)
 splitAt0 [] pos neg = (pos, neg)
 splitAt0 (u : us) pos neg = if snd u > 0
   then splitAt0 us (u : pos) neg
   else splitAt0 us pos (u : neg)
+
+
 
 
 data OperatorInfo = OperatorInfo {
@@ -74,4 +86,4 @@ showRational r =
       d = denominator r
   in if d == 1
     then show n
-    else show n ++ " / " ++ show d
+    else show n ++ "/" ++ show d
