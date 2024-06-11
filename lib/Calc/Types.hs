@@ -1,14 +1,15 @@
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE InstanceSigs #-}
 module Calc.Types where
 
 import Control.Lens
 import Data.Ratio (numerator, denominator)
 
 data Token =
-  Token'Value Rational Unit |
+  Token'Value Rational UnitComp |
   Token'Operator String |
   Token'OpeningBracket Char Char |
   Token'ClosingBracket Char
-  deriving (Show)
 
 
 data SIUnit =
@@ -17,17 +18,27 @@ data SIUnit =
   Mass
   deriving (Eq)
 
-data Unit = Unit {uSIUnit :: SIUnit, uFactor :: Rational, uSymbol :: String}
-  deriving (Eq)
-instance Show Unit where
-  show = uSymbol
+-- instance Eq Unit where
+--   (==) :: Unit -> Unit -> Bool
+--   u1 == u2 = _uSIUnit u1 == _uSIUnit u2
+-- instance Ord Unit where
+--   compare :: Unit -> Unit -> Ordering
+--   compare u1 u2 = compare (_uFactor u1) (_uFactor u2)
+instance Show SIUnit where
+  show Length = "m"
+  show Time   = "t"
+  show Mass   = "kg"
 
-type UnitList = [(Unit, Int)]
+type UnitList = [(SIUnit, Int)]
+data UnitComp = UnitComp {_ucSIUnits :: UnitList, _ucSymbol :: Maybe (String, Int)}
 
-data UnitComp = UnitComp {ucSIUnits :: UnitList, ucSymbol :: Maybe (String, Int)}
+emptyUnitComp :: UnitComp
+emptyUnitComp = UnitComp [] Nothing
 
-unitComp :: Unit -> UnitComp
-unitComp unit = UnitComp {ucSIUnits = [(unit, 1)], ucSymbol = Nothing}
+unitComp :: SIUnit -> UnitComp
+unitComp unit = UnitComp {_ucSIUnits = [(unit, 1)], _ucSymbol = Nothing}
+
+$(makeLenses 'UnitComp)
 
 
 instance Show UnitComp where
@@ -36,11 +47,11 @@ instance Show UnitComp where
     | e > 1     = s ++ "^" ++ show e
     | e == -1   = "1/" ++ s
     | otherwise = "1/" ++ s ++ "^" ++ show (-e)
-  show (UnitComp us _) = case splitAt0 us [] [] of
+  show (UnitComp us _) = case splitAt0 us of
     ([] , [])  -> ""
     (pos, [])  -> go pos
-    ([] , neg) -> "1/" ++ go neg
-    (pos, neg) -> go pos ++ "/" ++ go (map (_2 %~ negate) neg)
+    ([] , neg) -> "/" ++ go (map (_2 *~ -1) neg)
+    (pos, neg) -> go pos ++ "/" ++ go (map (_2 *~ -1) neg)
     where
       go :: UnitList -> String
       go [] = ""
@@ -49,11 +60,9 @@ instance Show UnitComp where
         | otherwise = show u ++ "^" ++ show e ++ go us
 
 
-splitAt0 :: UnitList -> UnitList -> UnitList -> (UnitList, UnitList)
-splitAt0 [] pos neg = (pos, neg)
-splitAt0 (u : us) pos neg = if snd u > 0
-  then splitAt0 us (u : pos) neg
-  else splitAt0 us pos (u : neg)
+splitAt0 :: UnitList -> (UnitList, UnitList)
+splitAt0 = foldl (\r u -> r & lens u %~ (u :)) ([], [])
+  where lens u = if snd u > 0 then _1 else _2
 
 
 
@@ -62,10 +71,10 @@ data OperatorInfo = OperatorInfo {
   opType :: String,
   opPrecedence :: Word, 
   fun :: Rational -> Rational -> Rational,
-  fun2 :: Unit -> Unit -> Unit}
+  fun2 :: UnitComp -> UnitComp -> UnitComp}
 
 data RPN =
-  RPN'Value Rational Unit |
+  RPN'Value Rational UnitComp |
   RPN'Operator OperatorInfo
 
 instance Show RPN where
@@ -74,7 +83,7 @@ instance Show RPN where
 
 
 
-data Result = Result Rational Unit
+data Result = Result Rational UnitComp
 
 instance Show Result where
   show (Result r u) = showRational r ++ show u

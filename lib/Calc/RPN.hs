@@ -5,7 +5,7 @@ import Control.Monad.Trans.Maybe (MaybeT)
 import Data.Ratio (Ratio, numerator, denominator)
 
 import Calc.Unit (multiply, divide)
-import Calc.Types (Unit, OperatorInfo(..), RPN(..), Result(..))
+import Calc.Types (UnitComp, OperatorInfo(..), RPN(..), Result(..))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 
 buildInOperators :: [OperatorInfo]
@@ -19,7 +19,7 @@ buildInOperators = [
 evaluate :: [RPN] -> MaybeT IO Result
 evaluate = go []
   where
-    go :: [(Rational, Unit)] -> [RPN] -> MaybeT IO Result
+    go :: [(Rational, UnitComp)] -> [RPN] -> MaybeT IO Result
     go []       [] = error "not possible"
     go [(d, u)] [] = return $ Result d u
     go (_ : _)  [] = liftIO (putStrLn "missing operator") >> fail ""

@@ -64,7 +64,8 @@ value :: Tokenizer Token
 value = try $ do
   n <- number
   spaces
-  Token'Value n <$> unitParser
+  (u, r) <- unitParser
+  return $ Token'Value (n * r) u
 
 openingBracket :: Tokenizer Token
 openingBracket = choice [
