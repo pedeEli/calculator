@@ -58,4 +58,7 @@ unitConversion :: TestTree
 unitConversion = testGroup "Unit conversion" [
   $(testCalc "$a kgm/s^2" [| id |] "N"),
   $(testCalc "$a kgm/s^2 * 1s" [| id |] "kgm/s"),
-  $(testCalc "$a N/kg" [| id |] "m/s^2")]
+  $(testCalc "$a N/kg" [| id |] "m/s^2"),
+  $(testCalc "$a km" [| (* 1000) |] "m"),
+  $(testCalc "$a mm" [| (/ 1000) |] "m"),
+  $(testCalc "$a min" [| (* 60) |] "s")]
