@@ -1,27 +1,33 @@
+{-# LANGUAGE ExistentialQuantification, FlexibleContexts #-}
 module Calc.RPN where
 
 import Control.Monad.Trans.Maybe (MaybeT)
+import Control.Monad.IO.Class (MonadIO(liftIO))
 
 import Data.Ratio (Ratio, numerator, denominator)
 
 import Calc.Unit (multiply, divide)
-import Calc.Types (UnitComp, OperatorInfo(..), RPN(..), Result(..))
-import Control.Monad.IO.Class (MonadIO(liftIO))
-
-buildInOperators :: [OperatorInfo]
-buildInOperators = [
-  OperatorInfo "+" 0 (+) (const id),
-  OperatorInfo "-" 0 (-) (const id),
-  OperatorInfo "*" 1 (*) multiply,
-  OperatorInfo "/" 1 (/) divide]
+import Calc.Function (Fun, evaluateFunction)
+import Calc.Value (Value, isStandaloneUnit)
 
 
-evaluate :: [RPN] -> MaybeT IO Result
+data RPN =
+  RPN'Value Value |
+  forall f. Fun f => RPN'Function String f
+instance Show RPN where
+  show (RPN'Value v) = show v
+  show (RPN'Function name _) = name
+
+
+evaluate :: [RPN] -> MaybeT IO Value
 evaluate = go []
   where
-    go :: [(Rational, UnitComp)] -> [RPN] -> MaybeT IO Result
+    go :: [Value] -> [RPN] -> MaybeT IO Value
     go []       [] = error "not possible"
-    go [(d, u)] [] = return $ Result d u
-    go (_ : _)  [] = liftIO (putStrLn "missing operator") >> fail ""
-    go ((d1, u1) : (d2, u2) : ds) (RPN'Operator info : rest) = go ((fun info d2 d1, fun2 info u2 u1) : ds) rest
-    go ds (RPN'Value d u : rest) = go ((d, u) : ds) rest
+    go [v] [] = return v
+    go (v1 : v2 : rest) []
+      | isStandaloneUnit v1 || isStandaloneUnit v2 = go (v1 * v2 : rest) []
+      | otherwise = liftIO (putStrLn "missing function") >> fail ""
+    -- go (_ : _)  [] = liftIO (putStrLn "missing function") >> fail ""
+    go ds (RPN'Function _ f : rest) = go (evaluateFunction ds f) rest
+    go ds (RPN'Value v : rest)  = go (v : ds) rest

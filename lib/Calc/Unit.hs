@@ -1,19 +1,56 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards, TemplateHaskell, TupleSections #-}
 module Calc.Unit where
 
 import Text.Parsec
 
-import Data.List (findIndex, find)
+import Data.List (findIndex, find, sort, sortBy, singleton)
+import Data.Ord (Down(Down))
 
 import Control.Lens
 
-import Calc.Types
-import Control.Monad (when)
 
-import Debug.Trace
+data SIUnit = Mass | Length | Time
+  deriving (Eq, Ord)
 
-combineUnitLists :: UnitList -> UnitList -> UnitList
-combineUnitLists u1 u2 = filter ((0 /=) . snd) $ go (u1 ++ u2) []
+type UnitList = [(SIUnit, Int)]
+newtype Unit = Unit UnitList
+
+$(makePrisms 'Unit)
+
+instance Show SIUnit where
+  show Length = "m"
+  show Time   = "s"
+  show Mass   = "kg"
+instance Show Unit where
+  show us = case find ((us ==) . view _2) composedUnits of
+    Just (symbol, _, _) -> " " ++ symbol
+    Nothing -> case splitAt0 us of
+      ([] , [])  -> ""
+      (pos, [])  -> " " ++ go pos
+      ([] , neg) -> " 1/" ++ go (map (_2 *~ -1) neg)
+      (pos, neg) -> " " ++ go pos ++ "/" ++ go (map (_2 *~ -1) neg)
+    where
+      go :: UnitList -> String
+      go [] = ""
+      go ((u, e) : us)
+        | e == 1 = show u ++ go us
+        | otherwise = show u ++ "^" ++ show e ++ go us
+splitAt0 :: Unit -> (UnitList, UnitList)
+splitAt0 = (both %~ sort) . foldl (\r u -> r & lens u %~ (u :)) ([], []) . view _Unit
+  where lens u = if snd u > 0 then _1 else _2
+
+instance Eq Unit where
+  Unit ul1 == Unit ul2
+    | length ul1 /= length ul2 = False
+    | otherwise = sort ul1 == sort ul2
+
+siUnit :: SIUnit -> Unit
+siUnit unit = Unit [(unit, 1)]
+
+
+
+multiply :: Unit -> Unit -> Unit
+multiply (Unit u1) (Unit u2) = Unit $ filter ((0 /=) . snd) $ go (u1 ++ u2) []
   where
     go :: UnitList -> UnitList -> UnitList
     go [] acc = acc
@@ -21,76 +58,52 @@ combineUnitLists u1 u2 = filter ((0 /=) . snd) $ go (u1 ++ u2) []
       Nothing -> go us ((u, e) : acc)
       Just index -> go us $ acc & ix index . _2 +~ e
 
-multiply :: UnitComp -> UnitComp -> UnitComp
-multiply u1 u2 =
-  let result = combineUnitLists (_ucSIUnits u1) (_ucSIUnits u2)
-  in case find (unitListEq result . view (_2 . ucSIUnits)) supportedUnits of
-    Nothing -> UnitComp result Nothing
-    Just (_, uc, _) -> uc
-
-divide :: UnitComp -> UnitComp -> UnitComp
-divide u1 u2 = multiply u1 $ u2 & ucSIUnits . mapped . _2 *~ -1
+divide :: Unit -> Unit -> Unit
+divide u1 u2 = multiply u1 $ u2 & _Unit . mapped . _2 *~ -1
 
 
-multiply' :: (UnitComp, Rational) -> (UnitComp, Rational) -> (UnitComp, Rational)
-multiply' (u1, r1) (u2, r2) = (
-  multiply u1 u2,
-  r1 * r2)
-
-divide' :: (UnitComp, Rational) -> (UnitComp, Rational) -> (UnitComp, Rational)
-divide' (u1, r1) (u2, r2) = (
-  divide u1 u2,
-  r1 / r2)
 
 
-empty :: (UnitComp, Rational)
-empty = (emptyUnitComp, 1)
 
-isEmpty :: (UnitComp, Rational) -> Bool
-isEmpty (uc, _) = null $ _ucSIUnits uc
+empty :: (Unit, Rational)
+empty = (Unit [], 1)
 
-unitParser :: Parsec String (Maybe Token) (UnitComp, Rational)
-unitParser = option empty $ do
-    n <- choice [char '1' >> return empty, unitList]
-    d <- option empty $ try $ spaces >> char '/' >> spaces >> unitList
-    when (isEmpty n && isEmpty d) $ unexpected "1"
-    return $ divide' n d
+isEmpty :: (Unit, Rational) -> Bool
+isEmpty (Unit unitList, _) = null unitList
 
 
-unitList :: Parsec String (Maybe Token) (UnitComp, Rational)
-unitList = do
-  ul <- many1 unitWithExponent
-  return $ foldr multiply' empty ul
 
-unitWithExponent :: Parsec String (Maybe Token) (UnitComp, Rational)
-unitWithExponent = do
-  (UnitComp {..}, r) <- unit
+unit :: Parsec String () (Unit, Rational)
+unit = do
+  (Unit unitList, r) <- singleUnit
   e <- option 1 $ char '^' >> read <$> many1 digit
-  let uc = UnitComp {
-    _ucSIUnits = map (_2 *~ e) _ucSIUnits,
-    _ucSymbol = _ucSymbol & _Just . _2 *~ e}
+  let uc = Unit $ map (_2 *~ e) unitList
   return (uc, r ^ e)
 
 
+singleUnit :: Parsec String () (Unit, Rational)
+singleUnit = choice $ map (\(s, a, r) -> try $ string s >> return (a, r)) allUnits
 
-unit :: Parsec String (Maybe Token) (UnitComp, Rational)
-unit = choice $ map (\(s, a, r) -> try $ string s >> return (a, r)) supportedUnits
+allUnits :: [(String, Unit, Rational)]
+allUnits = sortBy (\(a, _, _) (b, _, _) -> compare (Down a) (Down b)) $ composedUnits ++ map (_2 %~ Unit . singleton . (,1)) siUnits
 
+siUnits :: [(String, SIUnit, Rational)]
+siUnits = [
+  ("min", Time,   60),
+  ("ms",  Time,   0.001),
+  ("um",  Length, 0.000001),
+  ("mm",  Length, 0.001),
+  ("cm",  Length, 10),
+  ("dm",  Length, 100),
+  ("km",  Length, 1000),
+  ("kg",  Mass,   1),
+  ("h",   Time,   3600),
+  ("s",   Time,   1),
+  ("g",   Mass,   0.001),
+  ("m",   Length, 1)]
 
-
-supportedUnits :: [(String, UnitComp, Rational)]
-supportedUnits = [
-  ("min", unitComp Time,   60),
-  ("ms",  unitComp Time,   0.001),
-  ("um",  unitComp Length, 0.000001),
-  ("mm",  unitComp Length, 0.001),
-  ("cm",  unitComp Length, 10),
-  ("dm",  unitComp Length, 100),
-  ("km",  unitComp Length, 1000),
-  ("kg",  unitComp Mass,   1),
-  ("ha",  UnitComp [(Length, 2)] Nothing, 10000),
-  ("h",   unitComp Time,   3600),
-  ("s",   unitComp Time,   1),
-  ("g",   unitComp Mass,   0.001),
-  ("m",   unitComp Length, 1),
-  ("N",   UnitComp [(Mass, 1), (Length, 1), (Time, -2)] (Just ("N", 1)), 1)]
+composedUnits :: [(String, Unit, Rational)]
+composedUnits = [
+  ("ha", Unit [(Length, 2)], 10000),
+  ("Hz", Unit [(Time, -1)], 1),
+  ("N",  Unit [(Mass, 1), (Length, 1), (Time, -2)], 1)]

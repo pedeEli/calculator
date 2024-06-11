@@ -26,7 +26,8 @@ library
         Calc.ShuntingYard,
         Calc.RPN,
         Calc.Unit,
-        Calc.Types
+        Calc.Value,
+        Calc.Function
 
     -- Modules included in this library but not exported.
     -- other-modules:
