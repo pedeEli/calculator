@@ -18,8 +18,8 @@ import Control.Lens
 import Calc.Token (number)
 
 
-testCalc :: String -> ExpQ -> ExpQ
-testCalc str f = do
+testCalc :: String -> ExpQ -> String -> ExpQ
+testCalc str f unit = do
   (vars, strings) <- parseExpr str
   let args = map createArg $ nub vars
       nameE = litE $ createName vars strings
@@ -30,7 +30,9 @@ testCalc str f = do
     noBindS $ caseE (varE "result") [
       match (conP "Nothing" []) (normalB $ appE (varE "fail") $ litE "") [],
       match (conP "Just" [conP "Result" [varP "r", varP "u"]]) (
-        normalB $ varE "assert" $: varE "r" ==: (apply f vars)
+        normalB $ doE [
+          noBindS $ varE "assert" $: varE "r" ==: apply f vars,
+          noBindS $ varE "assert" $: showE (varE "u") ==: litE unit]
       ) []
     ]]
 

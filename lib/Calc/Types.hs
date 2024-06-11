@@ -20,7 +20,7 @@ data SIUnit =
   deriving (Eq, Ord)
 instance Show SIUnit where
   show Length = "m"
-  show Time   = "t"
+  show Time   = "s"
   show Mass   = "kg"
 
 type UnitList = [(SIUnit, Int)]
