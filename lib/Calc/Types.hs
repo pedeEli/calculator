@@ -1,9 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE InstanceSigs #-}
 module Calc.Types where
 
 import Control.Lens
+
 import Data.Ratio (numerator, denominator)
+import Data.List (find, sort)
 
 data Token =
   Token'Value Rational UnitComp |
@@ -13,17 +14,10 @@ data Token =
 
 
 data SIUnit =
+  Mass |
   Length |
-  Time |
-  Mass
-  deriving (Eq)
-
--- instance Eq Unit where
---   (==) :: Unit -> Unit -> Bool
---   u1 == u2 = _uSIUnit u1 == _uSIUnit u2
--- instance Ord Unit where
---   compare :: Unit -> Unit -> Ordering
---   compare u1 u2 = compare (_uFactor u1) (_uFactor u2)
+  Time
+  deriving (Eq, Ord)
 instance Show SIUnit where
   show Length = "m"
   show Time   = "t"
@@ -31,6 +25,11 @@ instance Show SIUnit where
 
 type UnitList = [(SIUnit, Int)]
 data UnitComp = UnitComp {_ucSIUnits :: UnitList, _ucSymbol :: Maybe (String, Int)}
+
+unitListEq :: UnitList -> UnitList -> Bool
+unitListEq ul1 ul2
+  | length ul1 /= length ul2 = False
+  | otherwise = sort ul1 == sort ul2
 
 emptyUnitComp :: UnitComp
 emptyUnitComp = UnitComp [] Nothing
@@ -61,7 +60,7 @@ instance Show UnitComp where
 
 
 splitAt0 :: UnitList -> (UnitList, UnitList)
-splitAt0 = foldl (\r u -> r & lens u %~ (u :)) ([], [])
+splitAt0 = (both %~ sort) . foldl (\r u -> r & lens u %~ (u :)) ([], [])
   where lens u = if snd u > 0 then _1 else _2
 
 

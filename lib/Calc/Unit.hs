@@ -3,7 +3,7 @@ module Calc.Unit where
 
 import Text.Parsec
 
-import Data.List (findIndex)
+import Data.List (findIndex, find)
 
 import Control.Lens
 
@@ -22,7 +22,11 @@ combineUnitLists u1 u2 = filter ((0 /=) . snd) $ go (u1 ++ u2) []
       Just index -> go us $ acc & ix index . _2 +~ e
 
 multiply :: UnitComp -> UnitComp -> UnitComp
-multiply u1 u2 = UnitComp (combineUnitLists (_ucSIUnits u1) (_ucSIUnits u2)) Nothing
+multiply u1 u2 =
+  let result = combineUnitLists (_ucSIUnits u1) (_ucSIUnits u2)
+  in case find (unitListEq result . view (_2 . ucSIUnits)) supportedUnits of
+    Nothing -> UnitComp result Nothing
+    Just (_, uc, _) -> uc
 
 divide :: UnitComp -> UnitComp -> UnitComp
 divide u1 u2 = multiply u1 $ u2 & ucSIUnits . mapped . _2 *~ -1
@@ -77,6 +81,7 @@ unit = choice $ map (\(s, a, r) -> try $ string s >> return (a, r)) supportedUni
 supportedUnits :: [(String, UnitComp, Rational)]
 supportedUnits = [
   ("min", unitComp Time,   60),
+  ("ms",  unitComp Time,   0.001),
   ("um",  unitComp Length, 0.000001),
   ("mm",  unitComp Length, 0.001),
   ("cm",  unitComp Length, 10),
@@ -87,4 +92,5 @@ supportedUnits = [
   ("h",   unitComp Time,   3600),
   ("s",   unitComp Time,   1),
   ("g",   unitComp Mass,   0.001),
-  ("m",   unitComp Length, 1)]
+  ("m",   unitComp Length, 1),
+  ("N",   UnitComp [(Mass, 1), (Length, 1), (Time, -2)] (Just ("N", 1)), 1)]
