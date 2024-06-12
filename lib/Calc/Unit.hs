@@ -22,7 +22,7 @@ instance Show SIUnit where
   show Time   = "s"
   show Mass   = "kg"
 instance Show Unit where
-  show us = case find ((us ==) . view _2) composedUnits of
+  show us = case find (\a -> us == a ^. _2 && 1 == a ^. _3) composedUnits of
     Just (symbol, _, _) -> " " ++ symbol
     Nothing -> case splitAt0 us of
       ([] , [])  -> ""

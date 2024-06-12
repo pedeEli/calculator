@@ -25,9 +25,6 @@ evaluate = go []
     go :: [Value] -> [RPN] -> MaybeT IO Value
     go []       [] = error "not possible"
     go [v] [] = return v
-    go (v1 : v2 : rest) []
-      | isStandaloneUnit v1 || isStandaloneUnit v2 = go (v1 * v2 : rest) []
-      | otherwise = liftIO (putStrLn "missing function") >> fail ""
-    -- go (_ : _)  [] = liftIO (putStrLn "missing function") >> fail ""
+    go (_ : _) [] = liftIO (putStrLn "missing function") >> fail ""
     go ds (RPN'Function _ f : rest) = go (evaluateFunction ds f) rest
     go ds (RPN'Value v : rest)  = go (v : ds) rest

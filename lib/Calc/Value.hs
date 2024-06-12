@@ -45,10 +45,12 @@ instance Fractional Value where
 
 
 applyRoot :: Rational -> Integer -> Rational
-applyRoot rational root =
-  let n = numerator rational
-      d = denominator rational
-  in toRational (fromIntegral n ** (1 / fromIntegral root)) / fromIntegral d
+applyRoot rational root
+  | root == 1 = rational
+  | otherwise =
+    let n = numerator rational
+        d = denominator rational
+    in toRational (fromIntegral n ** (1 / fromIntegral root)) / fromIntegral d
 
 
 

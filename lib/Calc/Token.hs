@@ -1,9 +1,10 @@
 module Calc.Token where
 
 import Text.Parsec
+import Text.Parsec.Prim (ParsecT(..))
 
-import Data.List (singleton)
-import Data.Functor (($>))
+import Data.List (singleton, intersperse)
+import Data.Functor (($>), (<&>))
 import Data.Functor.Identity (Identity)
 import Data.Ratio (Ratio, (%))
 
@@ -11,26 +12,46 @@ import Control.Monad (when)
 import Control.Monad.Trans.Maybe (MaybeT)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 
-import Calc.Unit (unit, empty)
+import Calc.Unit (unit, empty, Unit(..))
 import Calc.Value (Value(..))
+import Debug.Trace (trace)
 
 data Token =
   Token'Value Value |
   Token'Operator String |
   Token'OpeningBracket Char Char |
   Token'ClosingBracket Char
+  deriving (Show)
+
+data Cast = Cast [Token] String
+  deriving (Show)
 
 type Tokenizer = Parsec String ()
 
-tokenize :: String -> MaybeT IO [Token]
+tokenize :: String -> MaybeT IO ([Token], Maybe Cast)
 tokenize str = do
-  let result = runParser Calc.Token.tokens () "" str
+  let result = runParser temp () "" str
   case result of
     Left err -> liftIO (print err) >> fail ""
     Right tokens -> return tokens
 
+temp :: Tokenizer ([Token], Maybe Cast)
+temp = do
+  ts <- Calc.Token.tokens
+  cs <- optionMaybe cast
+  return (ts, cs)
+
 tokens :: Tokenizer [Token]
-tokens = many $ spaces *> choice [unitWrapper, value, openingBracket, closingBracket, operator] <* spaces
+tokens = concat <$> many1 (spaces *> choice (implicitMult : singles) <* spaces)
+  where
+    singles = map (singleton <$>) [openingBracket, closingBracket, operator, rest]
+
+
+implicitMult :: Tokenizer [Token]
+implicitMult = do
+  tokens <- many1 $ choice [unitWrapper, value]
+  return $ intersperse (Token'Operator "*") tokens
+
 
 number :: Tokenizer Rational
 number = do
@@ -72,14 +93,26 @@ value = do
 openingBracket :: Tokenizer Token
 openingBracket = choice [
   Token'OpeningBracket ')' <$> char '(',
-  Token'OpeningBracket ']' <$> char '[',
-  Token'OpeningBracket '}' <$> char '}']
+  Token'OpeningBracket '}' <$> char '{']
 
 closingBracket :: Tokenizer Token
-closingBracket = Token'ClosingBracket <$> oneOf ")]}"
+closingBracket = Token'ClosingBracket <$> oneOf ")}"
 
 operator :: Tokenizer Token
-operator = Token'Operator <$> manyTill anyChar (lookAhead $ space <|> alphaNum <|> oneOf "()[]{}")
+operator = Token'Operator <$> manyTill (noneOf "()[]{}") (lookAhead $ space <|> alphaNum)
+
+cast :: Tokenizer Cast
+cast = do
+  char '['
+  tokens <- lookAhead $ many1 units
+  symbols <- manyTill anyChar (char ']')
+  return $ Cast tokens symbols
+  where
+    value1, valueNot1 :: Tokenizer Token
+    value1 = char '1' >> return (Token'Value $ Value 1 1 (Unit []))
+    valueNot1 = oneOf "023456789" >> fail "only digit 1 is allowed"
+
+    units = spaces *> choice [valueNot1, unitWrapper, value1, openingBracket, closingBracket, rest, operator] <* spaces
 
 rest :: Tokenizer Token
 rest = do

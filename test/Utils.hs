@@ -29,10 +29,8 @@ testCalc str f unit = do
     bindS (varP "result") $ varE "run" $: varE "calc" $: createCalc vars strings,
     noBindS $ caseE (varE "result") [
       match (conP "Nothing" []) (normalB $ appE (varE "fail") $ litE "") [],
-      match (conP "Just" [conP "Result" [varP "r", varP "u"]]) (
-        normalB $ doE [
-          noBindS $ varE "assert" $: varE "r" ==: apply f vars,
-          noBindS $ varE "assert" $: showE (varE "u") ==: litE unit]
+      match (conP "Just" [varP "value"]) (
+        normalB $ varE "assert" $: showE (varE "value") ==: appE (varE "showRational") (apply f vars) ++: litE unit
       ) []
     ]]
 
@@ -90,7 +88,11 @@ conP = TH.conP . mkName
 
 
 convertToRational :: Double -> Rational
-convertToRational d = runParser number Nothing "" (show d) ^?! _Right
+convertToRational = go . show
+  where
+    go :: String -> Rational
+    go ('-' : rest) = -1 * go rest
+    go rest = runParser number () "" rest ^?! _Right
 
 
 data Variable = Variable {vName :: Char, vMod :: Maybe String}
@@ -129,7 +131,7 @@ parseVariable = do
 
 
 parseMod :: Parsec String ([Variable], [String]) String
-parseMod = choice [
+parseMod = choice $ map try [
   string ">0" >> return "Positive",
   string "<0" >> return "Negative",
   string ">=0" >> return "NonNegative",
