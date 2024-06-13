@@ -6,17 +6,17 @@ import Control.Lens
 
 import Data.Ratio (numerator, denominator, (%))
 
-import Calc.Unit (Unit(..), multiply, divide, _Unit)
+import Calc.Unit (Unit(..), SIUnit, multiply, divide, _Unit, showUnit'SIUnit)
 
 data Value =
-  Value {_vBase :: Rational, _vRoot :: Integer, _vUnit :: Unit} |
+  Value {_vBase :: Rational, _vRoot :: Integer, _vUnit :: Unit SIUnit} |
   Error String
 
 $(makeLenses 'Value)
 
 instance Show Value where
   show (Error s) = s
-  show (Value b r u) = showRoot r ++ showRational b ++ show u
+  show (Value b r u) = showRoot r ++ showRational b ++ showUnit'SIUnit u
 
 
 instance Num Value where

@@ -35,7 +35,7 @@ library
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
     build-depends:
-        base ^>=4.16.4.0,
+        base >=4.16.4.0,
         parsec >= 3.1.17.0,
         transformers >= 0.6.1.1,
         lens >= 5.2
@@ -51,7 +51,7 @@ executable rechner
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
     build-depends:
-        base ^>=4.16.4.0,
+        base >=4.16.4.0,
         parsec >= 3.1.17.0,
         transformers >= 0.6.1.1,
         rechner
@@ -65,7 +65,7 @@ test-suite rechner-test
     hs-source-dirs:   test
     main-is:          CalcTest.hs
     build-depends:
-        base ^>=4.16.4.0,
+        base >=4.16.4.0,
         tasty >= 1.5,
         tasty-quickcheck >= 0.10.3,
         QuickCheck >= 2.15,

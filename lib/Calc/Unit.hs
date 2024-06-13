@@ -12,8 +12,8 @@ import Control.Lens
 data SIUnit = Mass | Length | Time
   deriving (Eq, Ord)
 
-type UnitList = [(SIUnit, Int)]
-newtype Unit = Unit UnitList
+type UnitList a = [(a, Int)]
+newtype Unit a = Unit (UnitList a)
 
 $(makePrisms 'Unit)
 
@@ -21,59 +21,60 @@ instance Show SIUnit where
   show Length = "m"
   show Time   = "s"
   show Mass   = "kg"
-instance Show Unit where
-  show us = case find (\a -> us == a ^. _2 && 1 == a ^. _3) composedUnits of
-    Just (symbol, _, _) -> " " ++ symbol
-    Nothing -> case splitAt0 us of
-      ([] , [])  -> ""
-      (pos, [])  -> " " ++ go pos
-      ([] , neg) -> " 1/" ++ go (map (_2 *~ -1) neg)
-      (pos, neg) -> " " ++ go pos ++ "/" ++ go (map (_2 *~ -1) neg)
-    where
-      go :: UnitList -> String
-      go [] = ""
-      go ((u, e) : us)
-        | e == 1 = show u ++ go us
-        | otherwise = show u ++ "^" ++ show e ++ go us
-splitAt0 :: Unit -> (UnitList, UnitList)
+
+showUnit'SIUnit :: Unit SIUnit -> String
+showUnit'SIUnit us = case find (\a -> us == a ^. _2 && 1 == a ^. _3) composedUnits of
+  Just (symbol, _, _) -> " " ++ symbol
+  Nothing -> case splitAt0 us of
+    ([] , [])  -> ""
+    (pos, [])  -> " " ++ go pos
+    ([] , neg) -> " 1/" ++ go (map (_2 *~ -1) neg)
+    (pos, neg) -> " " ++ go pos ++ "/" ++ go (map (_2 *~ -1) neg)
+  where
+    go :: UnitList SIUnit -> String
+    go [] = ""
+    go ((u, e) : us)
+      | e == 1 = show u ++ go us
+      | otherwise = show u ++ "^" ++ show e ++ go us
+splitAt0 :: Unit SIUnit -> (UnitList SIUnit, UnitList SIUnit)
 splitAt0 = (both %~ sort) . foldl (\r u -> r & lens u %~ (u :)) ([], []) . view _Unit
   where lens u = if snd u > 0 then _1 else _2
 
-instance Eq Unit where
+instance Ord a => Eq (Unit a) where
   Unit ul1 == Unit ul2
     | length ul1 /= length ul2 = False
     | otherwise = sort ul1 == sort ul2
 
-siUnit :: SIUnit -> Unit
+siUnit :: SIUnit -> Unit SIUnit
 siUnit unit = Unit [(unit, 1)]
 
 
 
-multiply :: Unit -> Unit -> Unit
+multiply :: Unit SIUnit -> Unit SIUnit -> Unit SIUnit
 multiply (Unit u1) (Unit u2) = Unit $ filter ((0 /=) . snd) $ go (u1 ++ u2) []
   where
-    go :: UnitList -> UnitList -> UnitList
+    go :: UnitList SIUnit -> UnitList SIUnit -> UnitList SIUnit
     go [] acc = acc
     go ((u, e) : us) acc = case findIndex ((u ==) . view _1) acc of
       Nothing -> go us ((u, e) : acc)
       Just index -> go us $ acc & ix index . _2 +~ e
 
-divide :: Unit -> Unit -> Unit
+divide :: Unit SIUnit -> Unit SIUnit -> Unit SIUnit
 divide u1 u2 = multiply u1 $ u2 & _Unit . mapped . _2 *~ -1
 
 
 
 
 
-empty :: (Unit, Rational, String)
+empty :: (Unit SIUnit, Rational, String)
 empty = (Unit [], 1, "")
 
-isEmpty :: (Unit, Rational) -> Bool
+isEmpty :: (Unit SIUnit, Rational) -> Bool
 isEmpty (Unit unitList, _) = null unitList
 
 
 
-unit :: Parsec String () (Unit, Rational, String)
+unit :: Parsec String () (Unit SIUnit, Rational, String)
 unit = do
   (symbol, Unit unitList, r) <- singleUnit
   e <- option 1 $ char '^' >> read <$> many1 digit
@@ -81,10 +82,10 @@ unit = do
   return (uc, r ^ e, symbol)
 
 
-singleUnit :: Parsec String () (String, Unit, Rational)
+singleUnit :: Parsec String () (String, Unit SIUnit, Rational)
 singleUnit = choice $ map (\u -> try (string $ u ^. _1) >> return u) allUnits
 
-allUnits :: [(String, Unit, Rational)]
+allUnits :: [(String, Unit SIUnit, Rational)]
 allUnits = sortBy (\(a, _, _) (b, _, _) -> compare (Down a) (Down b)) $ composedUnits ++ map (_2 %~ Unit . singleton . (,1)) siUnits
 
 siUnits :: [(String, SIUnit, Rational)]
@@ -102,7 +103,7 @@ siUnits = [
   ("g",   Mass,   0.001),
   ("m",   Length, 1)]
 
-composedUnits :: [(String, Unit, Rational)]
+composedUnits :: [(String, Unit SIUnit, Rational)]
 composedUnits = [
   ("ha", Unit [(Length, 2)], 10000),
   ("Hz", Unit [(Time, -1)], 1),
