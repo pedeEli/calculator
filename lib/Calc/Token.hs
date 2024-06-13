@@ -17,7 +17,7 @@ import Calc.Value (Value(..))
 import Debug.Trace (trace)
 
 data Token =
-  Token'Value Value |
+  Token'Value Value String |
   Token'Operator String |
   Token'OpeningBracket Char Char |
   Token'ClosingBracket Char
@@ -80,15 +80,15 @@ number = do
 
 unitWrapper :: Tokenizer Token
 unitWrapper = do
-  (u, r) <- unit
-  return $ Token'Value $ Value r 1 u
+  (u, r, symbol) <- unit
+  return $ Token'Value (Value r 1 u) symbol
 
 value :: Tokenizer Token
 value = do
   n <- number
   spaces
-  (u, r) <- option empty unit
-  return $ Token'Value $ Value (n * r) 1 u
+  (u, r, symbol) <- option empty unit
+  return $ Token'Value (Value (n * r) 1 u) symbol
 
 openingBracket :: Tokenizer Token
 openingBracket = choice [
@@ -109,7 +109,7 @@ cast = do
   return $ Cast tokens symbols
   where
     value1, valueNot1 :: Tokenizer Token
-    value1 = char '1' >> return (Token'Value $ Value 1 1 (Unit []))
+    value1 = char '1' >> return (Token'Value (Value 1 1 (Unit [])) "")
     valueNot1 = oneOf "023456789" >> fail "only digit 1 is allowed"
 
     units = spaces *> choice [valueNot1, unitWrapper, value1, openingBracket, closingBracket, rest, operator] <* spaces

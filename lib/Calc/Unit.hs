@@ -65,24 +65,24 @@ divide u1 u2 = multiply u1 $ u2 & _Unit . mapped . _2 *~ -1
 
 
 
-empty :: (Unit, Rational)
-empty = (Unit [], 1)
+empty :: (Unit, Rational, String)
+empty = (Unit [], 1, "")
 
 isEmpty :: (Unit, Rational) -> Bool
 isEmpty (Unit unitList, _) = null unitList
 
 
 
-unit :: Parsec String () (Unit, Rational)
+unit :: Parsec String () (Unit, Rational, String)
 unit = do
-  (Unit unitList, r) <- singleUnit
+  (symbol, Unit unitList, r) <- singleUnit
   e <- option 1 $ char '^' >> read <$> many1 digit
   let uc = Unit $ map (_2 *~ e) unitList
-  return (uc, r ^ e)
+  return (uc, r ^ e, symbol)
 
 
-singleUnit :: Parsec String () (Unit, Rational)
-singleUnit = choice $ map (\(s, a, r) -> try $ string s >> return (a, r)) allUnits
+singleUnit :: Parsec String () (String, Unit, Rational)
+singleUnit = choice $ map (\u -> try (string $ u ^. _1) >> return u) allUnits
 
 allUnits :: [(String, Unit, Rational)]
 allUnits = sortBy (\(a, _, _) (b, _, _) -> compare (Down a) (Down b)) $ composedUnits ++ map (_2 %~ Unit . singleton . (,1)) siUnits

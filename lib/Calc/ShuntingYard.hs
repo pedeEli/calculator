@@ -47,7 +47,7 @@ shuntingYard' _ [] = get >>= go
     go (OperatorStackType'Operator info : rest) = go rest <&> (RPN'Function (_opType info) (_fun info) :)
     go (OperatorStackType'Function name f : rest) = go rest <&> (RPN'Function name f :)
 shuntingYard' start (t : ts) = case t of
-  Token'Value value -> shuntingYard' False ts <&> (RPN'Value value :)
+  Token'Value value _ -> shuntingYard' False ts <&> (RPN'Value value :)
   Token'OpeningBracket closing opening -> modify (OperatorStackType'Bracket closing opening :) >> shuntingYard' False ts
   Token'ClosingBracket closing -> (++) <$> popUntilBracket closing <*> shuntingYard' False ts
   Token'Operator operator -> case find (\a -> operator == _opType a) buildInOperators of
