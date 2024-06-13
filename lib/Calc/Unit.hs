@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, TemplateHaskell, TupleSections #-}
+{-# LANGUAGE RecordWildCards, TemplateHaskell, TupleSections, ScopedTypeVariables #-}
 module Calc.Unit where
 
 import Text.Parsec
@@ -22,22 +22,29 @@ instance Show SIUnit where
   show Time   = "s"
   show Mass   = "kg"
 
+showUnit'String :: Unit String -> String
+showUnit'String (Unit ul) = showUnitList id ul
+
 showUnit'SIUnit :: Unit SIUnit -> String
 showUnit'SIUnit us = case find (\a -> us == a ^. _2 && 1 == a ^. _3) composedUnits of
   Just (symbol, _, _) -> " " ++ symbol
-  Nothing -> case splitAt0 us of
-    ([] , [])  -> ""
-    (pos, [])  -> " " ++ go pos
-    ([] , neg) -> " 1/" ++ go (map (_2 *~ -1) neg)
-    (pos, neg) -> " " ++ go pos ++ "/" ++ go (map (_2 *~ -1) neg)
+  Nothing -> showUnitList show (us ^. _Unit)
+
+showUnitList :: forall a. Ord a => (a -> String) -> UnitList a -> String
+showUnitList toString ul = case splitAt0 ul of
+  ([] , [])  -> ""
+  (pos, [])  -> " " ++ go pos
+  ([] , neg) -> " 1/" ++ go (map (_2 *~ -1) neg)
+  (pos, neg) -> " " ++ go pos ++ "/" ++ go (map (_2 *~ -1) neg)
   where
-    go :: UnitList SIUnit -> String
+    go :: UnitList a -> String
     go [] = ""
     go ((u, e) : us)
-      | e == 1 = show u ++ go us
-      | otherwise = show u ++ "^" ++ show e ++ go us
-splitAt0 :: Unit SIUnit -> (UnitList SIUnit, UnitList SIUnit)
-splitAt0 = (both %~ sort) . foldl (\r u -> r & lens u %~ (u :)) ([], []) . view _Unit
+      | e == 1 = toString u ++ go us
+      | otherwise = toString u ++ "^" ++ show e ++ go us
+
+splitAt0 :: Ord a => UnitList a -> (UnitList a, UnitList a)
+splitAt0 = (both %~ sort) . foldl (\r u -> r & lens u %~ (u :)) ([], [])
   where lens u = if snd u > 0 then _1 else _2
 
 instance Ord a => Eq (Unit a) where
@@ -50,16 +57,16 @@ siUnit unit = Unit [(unit, 1)]
 
 
 
-multiply :: Unit SIUnit -> Unit SIUnit -> Unit SIUnit
+multiply :: forall a. Eq a => Unit a -> Unit a -> Unit a
 multiply (Unit u1) (Unit u2) = Unit $ filter ((0 /=) . snd) $ go (u1 ++ u2) []
   where
-    go :: UnitList SIUnit -> UnitList SIUnit -> UnitList SIUnit
+    go :: UnitList a -> UnitList a -> UnitList a
     go [] acc = acc
     go ((u, e) : us) acc = case findIndex ((u ==) . view _1) acc of
       Nothing -> go us ((u, e) : acc)
       Just index -> go us $ acc & ix index . _2 +~ e
 
-divide :: Unit SIUnit -> Unit SIUnit -> Unit SIUnit
+divide :: Eq a => Unit a -> Unit a -> Unit a
 divide u1 u2 = multiply u1 $ u2 & _Unit . mapped . _2 *~ -1
 
 
