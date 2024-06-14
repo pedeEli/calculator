@@ -1,19 +1,15 @@
-{-# LANGUAGE NamedFieldPuns #-}
 module Calc.Token where
 
 import Text.Parsec as P
 
 import Data.List (singleton, intersperse)
-import Data.Functor (($>), (<&>))
-import Data.Functor.Identity (Identity)
-import Data.Ratio (Ratio, (%))
+import Data.Ratio ((%))
 
-import Control.Lens
 import Control.Monad (when)
 import Control.Monad.Trans.Maybe (MaybeT)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 
-import Calc.Unit (unit, empty, Unit(..), SIUnit)
+import Calc.Unit (unit, empty, Unit(..))
 import Calc.Value (Value(..))
 
 
@@ -31,14 +27,14 @@ tokenize str = do
   let result = runParser tokensAndCast () "" str
   case result of
     Left err -> liftIO (print err) >> fail ""
-    Right tokens -> return tokens
+    Right ts -> return ts
 
 
 tokensAndCast :: Tokenizer ([Token], [Token])
 tokensAndCast = do
-  tokens <- Calc.Token.tokens
-  cast <- option [] cast
-  return (tokens, cast)
+  ts <- Calc.Token.tokens
+  c <- option [] cast
+  return (ts, c)
 
 tokens :: Tokenizer [Token]
 tokens = concat <$> many1 (spaces *> choice (implicitMult : singles) <* spaces)
@@ -47,8 +43,8 @@ tokens = concat <$> many1 (spaces *> choice (implicitMult : singles) <* spaces)
 
 implicitMult :: Tokenizer [Token]
 implicitMult = do
-  tokens <- many1 $ choice [unitWrapper, value]
-  return $ intersperse (Token'Operator "*") tokens
+  ts <- many1 $ choice [unitWrapper, value]
+  return $ intersperse (Token'Operator "*") ts
 
 
 number :: Tokenizer Rational
@@ -57,19 +53,19 @@ number = do
   when (length digits /= 1 && head digits == '0') $ unexpected "0"
 
   decimal <- option "" decimalParser
-  exponent <- option (1 % 1) exponentParser
+  expo <- option (1 % 1) exponentParser
 
   let numerator = read $ digits ++ decimal
       denominator = 10 ^ fromIntegral (length decimal)
       baseNumber = numerator % denominator
-  return $ baseNumber * exponent
+  return $ baseNumber * expo
 
   where
     decimalParser = do
       char '.'
       many1 digit
     exponentParser = do
-      e <- oneOf "eE"
+      oneOf "eE"
       sign <- option "" (singleton <$> oneOf "+-")
       digits <- many1 digit
       return $ if sign == "-"
@@ -109,9 +105,9 @@ rest = do
 cast :: Tokenizer [Token]
 cast = do
   char '['
-  tokens <- many1 units
+  ts <- many1 units
   char ']'
-  return tokens
+  return ts
   where
     value1, valueNot1, unitWrapper' :: Tokenizer Token
     value1 = char '1' >> return (Token'Value (Value 1 1 (Unit []) (Unit [])) "")

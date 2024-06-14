@@ -14,14 +14,14 @@ data Nat = Zero | Succ Nat
 
 type CountArgs :: Type -> Nat
 type family CountArgs f where
-  CountArgs (Value -> res) = Succ (CountArgs res)
-  CountArgs other = Zero
+  CountArgs (Value -> res) = 'Succ (CountArgs res)
+  CountArgs other = 'Zero
 
 
 type FunctionWitness :: Type -> Nat -> Type
 data FunctionWitness f n where
-  FunctionFun :: Fun res => FunctionWitness (Value -> res) (Succ n)
-  FunctionNil :: FunctionWitness Value Zero
+  FunctionFun :: Fun res => FunctionWitness (Value -> res) ('Succ n)
+  FunctionNil :: FunctionWitness Value 'Zero
 
 
 type Function :: Type -> Nat -> Constraint
@@ -30,9 +30,9 @@ class Function f n where
 type Fun f = Function f (CountArgs f)
 
 
-instance (Function res n, CountArgs res ~ n) => Function (Value -> res) (Succ n) where
+instance (Function res n, CountArgs res ~ n) => Function (Value -> res) ('Succ n) where
   witness = FunctionFun
-instance Function Value Zero where
+instance Function Value 'Zero where
   witness = FunctionNil
 
 

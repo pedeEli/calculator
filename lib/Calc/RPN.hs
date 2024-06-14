@@ -4,11 +4,8 @@ module Calc.RPN where
 import Control.Monad.Trans.Maybe (MaybeT)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 
-import Data.Ratio (Ratio, numerator, denominator)
-
-import Calc.Unit (multiply, divide)
 import Calc.Function (Fun, evaluateFunction)
-import Calc.Value (Value, isStandaloneUnit)
+import Calc.Value (Value)
 
 
 data RPN =

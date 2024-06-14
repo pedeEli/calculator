@@ -44,8 +44,8 @@ showUnitList toString ul = case splitAt0 ul of
       | otherwise = toString u ++ "^" ++ show e ++ go us
 
 splitAt0 :: Ord a => UnitList a -> (UnitList a, UnitList a)
-splitAt0 = (both %~ sort) . foldl (\r u -> r & lens u %~ (u :)) ([], [])
-  where lens u = if snd u > 0 then _1 else _2
+splitAt0 = (both %~ sort) . foldl (\r u -> r & getLens u %~ (u :)) ([], [])
+  where getLens u = if snd u > 0 then _1 else _2
 
 instance Ord a => Eq (Unit a) where
   Unit ul1 == Unit ul2
@@ -53,7 +53,7 @@ instance Ord a => Eq (Unit a) where
     | otherwise = sort ul1 == sort ul2
 
 siUnit :: SIUnit -> Unit SIUnit
-siUnit unit = Unit [(unit, 1)]
+siUnit u = Unit [(u, 1)]
 
 
 
@@ -64,7 +64,7 @@ multiply (Unit u1) (Unit u2) = Unit $ filter ((0 /=) . snd) $ go (u1 ++ u2) []
     go [] acc = acc
     go ((u, e) : us) acc = case findIndex ((u ==) . view _1) acc of
       Nothing -> go us ((u, e) : acc)
-      Just index -> go us $ acc & ix index . _2 +~ e
+      Just i -> go us $ acc & ix i . _2 +~ e
 
 divide :: Eq a => Unit a -> Unit a -> Unit a
 divide u1 u2 = multiply u1 $ u2 & _Unit . mapped . _2 *~ -1

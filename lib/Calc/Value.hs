@@ -19,12 +19,12 @@ instance Show Value where
   show (Value b r u o) = showRoot r ++ showRational b ++ showUnit o u
     where
       showUnit :: Unit String -> Unit SIUnit -> String
-      showUnit (Unit []) u = showUnit'SIUnit u
-      showUnit u         _ = showUnit'String u
+      showUnit (Unit []) unit = showUnit'SIUnit unit
+      showUnit unit      _    = showUnit'String unit
 
 
 instance Num Value where
-  Value b1 r1 u1 o1 + Value b2 r2 u2 o2
+  Value b1 r1 u1 _ + Value b2 r2 u2 _
     | u1 /= u2 = Error "missmatching units"
     | otherwise = Value (applyRoot b1 r1 + applyRoot b2 r2) 1 u1 (Unit [])
   Error e + _ = Error e
