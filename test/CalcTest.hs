@@ -18,7 +18,7 @@ main = defaultMain tests
 
 
 tests :: TestTree
-tests = testGroup "Tests" [withoutUnits, withUnits, unitConversion]
+tests = testGroup "Tests" [withoutUnits, withUnits, unitConversion, unitCast]
 
 
 withoutUnits :: TestTree
@@ -62,3 +62,10 @@ unitConversion = testGroup "Unit conversion" [
   $(testCalc "$a km" [| (* 1000) |] " m"),
   $(testCalc "$a mm" [| (/ 1000) |] " m"),
   $(testCalc "$a min" [| (* 60) |] " s")]
+
+
+unitCast :: TestTree
+unitCast = testGroup "Unit cast" [
+  $(testCalc "$ag [kg]" [| (/ 1000) |] " kg"),
+  $(testCalc "$as[min]" [| (/ 60) |] " min"),
+  $(testCalc "$a m/s^2 [N/kg]" [| id |] " N/kg")]
