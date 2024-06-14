@@ -109,11 +109,12 @@ cast = do
   char ']'
   return ts
   where
-    value1, valueNot1, unitWrapper' :: Tokenizer Token
+    value1, valueNot1, unitWrapper', operator' :: Tokenizer Token
     value1 = char '1' >> return (Token'Value (Value 1 1 (Unit []) (Unit [])) "")
     valueNot1 = oneOf "023456789" >> fail "only 1 is allowed"
     unitWrapper' = do
       (u, r, (symbol, e)) <- unit
       return $ Token'Value (Value r 1 u (Unit [(symbol, e)])) symbol
+    operator' = choice [char '*' >> return (Token'Operator "*"), char '/' >> return (Token'Operator "/")]
 
-    units = spaces *> choice [valueNot1, unitWrapper', value1, openingBracket, closingBracket, rest, operator] <* spaces
+    units = spaces *> choice [valueNot1, unitWrapper', value1, openingBracket, closingBracket, rest, operator'] <* spaces
