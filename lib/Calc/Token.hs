@@ -43,7 +43,7 @@ tokensAndCast = do
 tokens :: Tokenizer [Token]
 tokens = concat <$> many1 (spaces *> choice (implicitMult : singles) <* spaces)
   where
-    singles = map (singleton <$>) [openingBracket, closingBracket, operator, rest]
+    singles = map (singleton <$>) [openingBracket, closingBracket, rest, operator]
 
 implicitMult :: Tokenizer [Token]
 implicitMult = do
