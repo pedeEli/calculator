@@ -26,7 +26,7 @@ data Token =
 
 type Tokenizer = Parsec String ()
 
-tokenize :: String -> MaybeT IO ([Token], Maybe [Token])
+tokenize :: String -> MaybeT IO ([Token], [Token])
 tokenize str = do
   let result = runParser tokensAndCast () "" str
   case result of
@@ -34,10 +34,10 @@ tokenize str = do
     Right tokens -> return tokens
 
 
-tokensAndCast :: Tokenizer ([Token], Maybe [Token])
+tokensAndCast :: Tokenizer ([Token], [Token])
 tokensAndCast = do
   tokens <- Calc.Token.tokens
-  cast <- optionMaybe cast
+  cast <- option [] cast
   return (tokens, cast)
 
 tokens :: Tokenizer [Token]
@@ -79,14 +79,14 @@ number = do
 unitWrapper :: Tokenizer Token
 unitWrapper = do
   (u, r, (symbol, e)) <- unit
-  return $ Token'Value (Value r 1 u Nothing) (symbol ++ "^" ++ show e)
+  return $ Token'Value (Value r 1 u (Unit [])) (symbol ++ "^" ++ show e)
 
 value :: Tokenizer Token
 value = do
   n <- number
   spaces
   (u, r, (symbol, e)) <- option empty unit
-  return $ Token'Value (Value (n * r) 1 u Nothing) (symbol ++ "^" ++ show e)
+  return $ Token'Value (Value (n * r) 1 u (Unit [])) (symbol ++ "^" ++ show e)
 
 openingBracket :: Tokenizer Token
 openingBracket = choice [
@@ -114,10 +114,10 @@ cast = do
   return tokens
   where
     value1, valueNot1, unitWrapper' :: Tokenizer Token
-    value1 = char '1' >> return (Token'Value (Value 1 1 (Unit []) Nothing) "")
+    value1 = char '1' >> return (Token'Value (Value 1 1 (Unit []) (Unit [])) "")
     valueNot1 = oneOf "023456789" >> fail "only 1 is allowed"
     unitWrapper' = do
       (u, r, (symbol, e)) <- unit
-      return $ Token'Value (Value r 1 u (Just $ Unit [(symbol, e)])) symbol
+      return $ Token'Value (Value r 1 u (Unit [(symbol, e)])) symbol
 
     units = spaces *> choice [valueNot1, unitWrapper', value1, openingBracket, closingBracket, rest, operator] <* spaces

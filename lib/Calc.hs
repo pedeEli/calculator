@@ -1,6 +1,6 @@
 module Calc (calc) where
 
-import Calc.Token (tokenize)
+import Calc.Token (tokenize, Token)
 import Calc.ShuntingYard (shuntingYard)
 import Calc.RPN (evaluate)
 import Calc.Value (Value(..), _vUnit, _vBase, _vUnitOverride, vBase, vUnitOverride)
@@ -18,14 +18,16 @@ calc str = runMaybeT $ do
   value <- evaluate rpn
   case value of
     Error err -> liftIO (putStrLn err) >> fail ""
-    _ -> case cast of
-      Nothing -> return value
-      Just cast -> do
-        rpn <- shuntingYard cast
-        unit <- evaluate rpn
-        case unit of
-          Error err -> liftIO (putStrLn err) >> fail ""
-          _ -> do
-            if _vUnit value /= _vUnit unit
-              then return $ Error "missmatched units"
-              else return $ value & vBase //~ (_vBase unit) & vUnitOverride .~ (_vUnitOverride unit)
+    _ -> applyCast value cast
+
+
+applyCast :: Value -> [Token] -> MaybeT IO Value
+applyCast v [] = return v
+applyCast v cast = do
+  rpn <- shuntingYard cast
+  unit <- evaluate rpn
+  case unit of
+    Error err -> liftIO (putStrLn err) >> fail ""
+    _ -> return $ if _vUnit v /= _vUnit unit
+      then Error "missmatched units"
+      else v & vBase //~ _vBase unit & vUnitOverride .~ _vUnitOverride unit
