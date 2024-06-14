@@ -1,27 +1,30 @@
 {-# LANGUAGE ExistentialQuantification, FlexibleContexts #-}
 module Calc.RPN where
 
-import Control.Monad.Trans.Maybe (MaybeT)
+import Control.Monad.Trans.Except
 import Control.Monad.IO.Class (MonadIO(liftIO))
 
 import Calc.Function (Fun, evaluateFunction)
 import Calc.Value (Value)
+import Calc.Error (Error(..), ErrorMessage(..), Position)
 
 
 data RPN =
-  RPN'Value Value |
-  forall f. Fun f => RPN'Function String f
+  RPN'Value Position Value |
+  forall f. Fun f => RPN'Function Position String f
 instance Show RPN where
-  show (RPN'Value v) = show v
-  show (RPN'Function name _) = name
+  show (RPN'Value _ v) = show v
+  show (RPN'Function _ name _) = name
 
 
-evaluate :: [RPN] -> MaybeT IO Value
+evaluate :: [RPN] -> Except Error Value
 evaluate = go []
   where
-    go :: [Value] -> [RPN] -> MaybeT IO Value
-    go []       [] = error "not possible"
-    go [v] [] = return v
-    go (_ : _) [] = liftIO (putStrLn "missing function") >> fail ""
-    go ds (RPN'Function _ f : rest) = go (evaluateFunction ds f) rest
-    go ds (RPN'Value v : rest)  = go (v : ds) rest
+    go :: [(Position, Value)] -> [RPN] -> Except Error Value
+    go []       [] = throwE $ Error mempty $ Message "empty input"
+    go [(_, v)] [] = return v
+    go (_ : _) [] = throwE $ Error mempty $ Message "" -- liftIO (putStrLn "missing function") >> fail ""
+    go ds (RPN'Function pos _ f : rest) = do
+      ds' <- evaluateFunction pos ds f
+      go ds' rest
+    go ds (RPN'Value pos v : rest)  = go ((pos, v) : ds) rest

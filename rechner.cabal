@@ -27,7 +27,8 @@ library
         Calc.RPN,
         Calc.Unit,
         Calc.Value,
-        Calc.Function
+        Calc.Function,
+        Calc.Error
 
     -- Modules included in this library but not exported.
     -- other-modules:

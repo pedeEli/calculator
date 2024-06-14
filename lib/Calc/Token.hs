@@ -2,32 +2,43 @@ module Calc.Token where
 
 import Text.Parsec as P
 
-import Data.List (singleton, intersperse)
+import Data.List (singleton)
 import Data.Ratio ((%))
 
 import Control.Monad (when)
-import Control.Monad.Trans.Maybe (MaybeT)
+import Control.Monad.Trans.Except (Except, throwE)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 
 import Calc.Unit (unit, empty, Unit(..))
 import Calc.Value (Value(..))
+import Calc.Error (fromParsecError, Error, Position(..))
 
 
-data Token =
-  Token'Value Value String |
+data TokenType =
+  Token'Value Value |
   Token'Operator String |
   Token'OpeningBracket Char Char |
   Token'ClosingBracket Char
   deriving (Show)
 
+data Token = Token {_tType :: TokenType, _tPos :: Position}
+
 type Tokenizer = Parsec String ()
 
-tokenize :: String -> MaybeT IO ([Token], [Token])
+tokenize :: String -> Except Error ([Token], [Token])
 tokenize str = do
   let result = runParser tokensAndCast () "" str
   case result of
-    Left err -> liftIO (print err) >> fail ""
     Right ts -> return ts
+    Left err -> throwE $ fromParsecError err
+
+
+addPosition :: Tokenizer TokenType -> Tokenizer Token
+addPosition parser = do
+  start <- getPosition
+  token <- parser
+  end <- getPosition
+  return Token {_tType = token, _tPos = Position (sourceColumn start) (sourceColumn end)}
 
 
 tokensAndCast :: Tokenizer ([Token], [Token])
@@ -39,12 +50,15 @@ tokensAndCast = do
 tokens :: Tokenizer [Token]
 tokens = concat <$> many1 (spaces *> choice (implicitMult : singles) <* spaces)
   where
-    singles = map (singleton <$>) [openingBracket, closingBracket, rest, operator]
+    singles = map (fmap singleton . addPosition) [openingBracket, closingBracket, rest, operator]
 
 implicitMult :: Tokenizer [Token]
 implicitMult = do
-  ts <- many1 $ choice [unitWrapper, value]
-  return $ intersperse (Token'Operator "*") ts
+  ts <- many1 $ choice $ map addPosition [unitWrapper, value]
+  return $ intersperseWith f ts
+  where
+    f :: Token -> Token -> Token
+    f t1 t2 = Token (Token'Operator "*") $ Position (_pStart $ _tPos t1) (_pEnd $ _tPos t2)
 
 
 number :: Tokenizer Rational
@@ -72,30 +86,30 @@ number = do
         then 1 % (10 ^ read digits)
         else (10 ^ read digits) % 1
 
-unitWrapper :: Tokenizer Token
+unitWrapper :: Tokenizer TokenType
 unitWrapper = do
-  (u, r, (symbol, e)) <- unit
-  return $ Token'Value (Value r 1 u (Unit [])) (symbol ++ "^" ++ show e)
+  (u, r, (symbol, _)) <- unit
+  return $ Token'Value (Value r 1 u (Unit []))
 
-value :: Tokenizer Token
+value :: Tokenizer TokenType
 value = do
   n <- number
   spaces
-  (u, r, (symbol, e)) <- option empty unit
-  return $ Token'Value (Value (n * r) 1 u (Unit [])) (symbol ++ "^" ++ show e)
+  (u, r, (symbol, _)) <- option empty unit
+  return $ Token'Value (Value (n * r) 1 u (Unit []))
 
-openingBracket :: Tokenizer Token
+openingBracket :: Tokenizer TokenType
 openingBracket = choice [
   Token'OpeningBracket ')' <$> char '(',
   Token'OpeningBracket '}' <$> char '{']
 
-closingBracket :: Tokenizer Token
+closingBracket :: Tokenizer TokenType
 closingBracket = Token'ClosingBracket <$> oneOf ")}"
 
-operator :: Tokenizer Token
+operator :: Tokenizer TokenType
 operator = Token'Operator <$> manyTill (P.noneOf "()[]{}") (lookAhead $ space <|> alphaNum)
 
-rest :: Tokenizer Token
+rest :: Tokenizer TokenType
 rest = do
   l <- letter
   unexpected $ singleton l
@@ -109,12 +123,21 @@ cast = do
   char ']'
   return ts
   where
-    value1, valueNot1, unitWrapper', operator' :: Tokenizer Token
-    value1 = char '1' >> return (Token'Value (Value 1 1 (Unit []) (Unit [])) "")
+    value1, valueNot1, unitWrapper', operator' :: Tokenizer TokenType
+    value1 = char '1' >> return (Token'Value (Value 1 1 (Unit []) (Unit [])))
     valueNot1 = oneOf "023456789" >> fail "only 1 is allowed"
     unitWrapper' = do
       (u, r, (symbol, e)) <- unit
-      return $ Token'Value (Value r 1 u (Unit [(symbol, e)])) symbol
+      return $ Token'Value (Value r 1 u (Unit [(symbol, e)]))
     operator' = choice [char '*' >> return (Token'Operator "*"), char '/' >> return (Token'Operator "/")]
 
-    units = spaces *> choice [valueNot1, unitWrapper', value1, openingBracket, closingBracket, rest, operator'] <* spaces
+    units = spaces *> choice (map addPosition [valueNot1, unitWrapper', value1, openingBracket, closingBracket, rest, operator']) <* spaces
+
+
+
+
+
+intersperseWith :: (a -> a -> a) -> [a] -> [a]
+intersperseWith _ []  = []
+intersperseWith _ [a] = [a]
+intersperseWith f (a1 : a2 : rest) = a1 : f a1 a2 : intersperseWith f (a2 : rest)

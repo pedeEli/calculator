@@ -12,7 +12,7 @@ main = do
 loop :: IO ()
 loop = do
   line <- getLine
-  result <- calc (line ++ "\n")
+  let result = calc (line ++ "\n")
   case result of
-    Nothing -> loop
-    Just d -> print d >> loop
+    Left err -> print err >> loop
+    Right d -> print d >> loop

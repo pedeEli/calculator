@@ -3,10 +3,12 @@
     MultiParamTypeClasses, FlexibleInstances #-}
 module Calc.Function where
 
+import Control.Monad.Trans.Except (Except, throwE)
 
 import Data.Kind (Type, Constraint)
 
 import Calc.Value (Value)
+import Calc.Error (Position, Error(..), ErrorMessage(..))
 
 
 data Nat = Zero | Succ Nat
@@ -37,9 +39,9 @@ instance Function Value 'Zero where
 
 
 
-evaluateFunction :: forall f. Fun f => [Value] -> f -> [Value]
-evaluateFunction ds f = case witness @f @(CountArgs f) of
-  FunctionNil -> f : ds
+evaluateFunction :: forall f. Fun f => Position -> [(Position, Value)] -> f -> Except Error [(Position, Value)]
+evaluateFunction pos ds f = case witness @f @(CountArgs f) of
+  FunctionNil -> return $ (pos, f) : ds
   FunctionFun -> case ds of
-    [] -> error "to few arguments"
-    (d : rest) -> evaluateFunction rest $ f d
+    [] -> throwE $ Error pos $ Message "too few arguments to function"
+    ((p, d) : rest) -> evaluateFunction (pos <> p) rest $ f d
