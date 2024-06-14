@@ -78,15 +78,15 @@ number = do
 
 unitWrapper :: Tokenizer Token
 unitWrapper = do
-  (u, r, symbol) <- unit
-  return $ Token'Value (Value r 1 u Nothing) symbol
+  (u, r, (symbol, e)) <- unit
+  return $ Token'Value (Value r 1 u Nothing) (symbol ++ "^" ++ show e)
 
 value :: Tokenizer Token
 value = do
   n <- number
   spaces
-  (u, r, symbol) <- option empty unit
-  return $ Token'Value (Value (n * r) 1 u Nothing) symbol
+  (u, r, (symbol, e)) <- option empty unit
+  return $ Token'Value (Value (n * r) 1 u Nothing) (symbol ++ "^" ++ show e)
 
 openingBracket :: Tokenizer Token
 openingBracket = choice [
@@ -117,7 +117,7 @@ cast = do
     value1 = char '1' >> return (Token'Value (Value 1 1 (Unit []) Nothing) "")
     valueNot1 = oneOf "023456789" >> fail "only 1 is allowed"
     unitWrapper' = do
-      (u@(Unit [(_, e)]), r, symbol) <- unit
+      (u, r, (symbol, e)) <- unit
       return $ Token'Value (Value r 1 u (Just $ Unit [(symbol, e)])) symbol
 
     units = spaces *> choice [valueNot1, unitWrapper', value1, openingBracket, closingBracket, rest, operator] <* spaces

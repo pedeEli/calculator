@@ -73,20 +73,20 @@ divide u1 u2 = multiply u1 $ u2 & _Unit . mapped . _2 *~ -1
 
 
 
-empty :: (Unit SIUnit, Rational, String)
-empty = (Unit [], 1, "")
+empty :: (Unit SIUnit, Rational, (String, Int))
+empty = (Unit [], 1, ("", 1))
 
 isEmpty :: (Unit SIUnit, Rational) -> Bool
 isEmpty (Unit unitList, _) = null unitList
 
 
 
-unit :: Parsec String () (Unit SIUnit, Rational, String)
+unit :: Parsec String () (Unit SIUnit, Rational, (String, Int))
 unit = do
   (symbol, Unit unitList, r) <- singleUnit
   e <- option 1 $ char '^' >> read <$> many1 digit
   let uc = Unit $ map (_2 *~ e) unitList
-  return (uc, r ^ e, symbol)
+  return (uc, r ^ e, (symbol, e))
 
 
 singleUnit :: Parsec String () (String, Unit SIUnit, Rational)
