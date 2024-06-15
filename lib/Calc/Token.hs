@@ -50,7 +50,7 @@ tokensAndCast = do
 tokens :: Tokenizer [Token]
 tokens = concat <$> many1 (spaces *> choice (implicitMult : singles) <* spaces)
   where
-    singles = map (fmap singleton . addPosition) [openingBracket, closingBracket, rest, operator]
+    singles = map (fmap singleton . addPosition) [openingBracket, closingBracket, operator]
 
 implicitMult :: Tokenizer [Token]
 implicitMult = do
@@ -88,7 +88,7 @@ number = do
 
 unitWrapper :: Tokenizer TokenType
 unitWrapper = do
-  (u, r, (symbol, _)) <- unit
+  (u, r, (symbol, _)) <- unit <?> "a unit"
   return $ Token'Value (Value r 1 u (Unit []))
 
 value :: Tokenizer TokenType
@@ -107,13 +107,7 @@ closingBracket :: Tokenizer TokenType
 closingBracket = Token'ClosingBracket <$> oneOf ")}"
 
 operator :: Tokenizer TokenType
-operator = Token'Operator <$> manyTill (P.noneOf "()[]{}") (lookAhead $ space <|> alphaNum)
-
-rest :: Tokenizer TokenType
-rest = do
-  l <- letter
-  unexpected $ singleton l
-
+operator = Token'Operator <$> many1 (oneOf "^°!\"§$%&/?`´\\*+~'#,;.:-_<>|@€") <?> "operator"
 
 
 cast :: Tokenizer [Token]
@@ -131,7 +125,7 @@ cast = do
       return $ Token'Value (Value r 1 u (Unit [(symbol, e)]))
     operator' = choice [char '*' >> return (Token'Operator "*"), char '/' >> return (Token'Operator "/")]
 
-    units = spaces *> choice (map addPosition [valueNot1, unitWrapper', value1, openingBracket, closingBracket, rest, operator']) <* spaces
+    units = spaces *> choice (map addPosition [valueNot1, unitWrapper', value1, openingBracket, closingBracket, operator']) <* spaces
 
 
 
