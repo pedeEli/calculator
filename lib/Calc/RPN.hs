@@ -23,7 +23,7 @@ evaluate = go []
     go :: [(Position, Value)] -> [RPN] -> Except Error Value
     go []       [] = throwE $ Error mempty $ Message "empty input"
     go [(_, v)] [] = return v
-    go (_ : _) [] = throwE $ Error mempty $ Message ""
+    go (_ : _) [] = throwE $ Error mempty $ Message "syntax error"
     go ds (RPN'Function pos _ f : rest) = do
       ds' <- evaluateFunction pos ds f
       go ds' rest

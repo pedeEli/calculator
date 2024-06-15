@@ -94,8 +94,7 @@ unitWrapper = do
 value :: Tokenizer TokenType
 value = do
   n <- number
-  spaces
-  (u, r, (symbol, _)) <- option empty unit
+  (u, r, (symbol, _)) <- option empty $ try $ spaces *> unit
   return $ Token'Value (Value (n * r) 1 u (Unit []))
 
 openingBracket :: Tokenizer TokenType

@@ -16,7 +16,7 @@ data Position = Position {_pStart :: Int, _pEnd :: Int}
 instance Semigroup Position where
   Position s1 e1 <> Position s2 e2 = Position (min s1 s2) (max e1 e2)
 instance Monoid Position where
-  mempty = Position minBound maxBound
+  mempty = Position maxBound minBound
 instance Show Position where
   show (Position start end) = show start ++ "-" ++ show end
 
