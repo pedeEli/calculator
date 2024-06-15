@@ -12,23 +12,23 @@ import Control.Monad.IO.Class (MonadIO(liftIO))
 
 import Calc.Token (Token(..), TokenType(..))
 import Calc.RPN (RPN(..))
-import Calc.Value(Value)
+import Calc.Value
 import Calc.Function (Fun)
 import Calc.Error (Error(..), Position, ErrorMessage(..))
 
 data OperatorInfo = OperatorInfo {
   _opType :: String,
   _opPrecedence :: Word,
-  _fun :: Value -> Value -> Value}
+  _fun :: Value -> Value -> Except String Value}
 
 $(makeLenses 'OperatorInfo)
 
 buildInOperators :: [OperatorInfo]
 buildInOperators = [
-  OperatorInfo "+" 0 (flip (+)),
-  OperatorInfo "-" 0 (flip (-)),
-  OperatorInfo "*" 1 (flip (*)),
-  OperatorInfo "/" 1 (flip (/))]
+  OperatorInfo "+" 0 (flip (<<+>>)),
+  OperatorInfo "-" 0 (flip (<<->>)),
+  OperatorInfo "*" 1 (flip (<<*>>)),
+  OperatorInfo "/" 1 (flip (<</>>))]
 
 data OperatorStackType =
   OperatorStackType'Operator Position OperatorInfo |
@@ -58,7 +58,7 @@ shuntingYard' start (t : ts) = case t of
       let isMinus = _opType info == "-"
           stackHead = stack ^? _head . _OperatorStackType'Bracket
       if isMinus && (start || isJust stackHead)
-        then modify (OperatorStackType'Function pos "negate" (negate :: Value -> Value) :) >> shuntingYard' False ts
+        then modify (OperatorStackType'Function pos "negate" vNegate :) >> shuntingYard' False ts
         else (++) <$> popOperators pos info <*> shuntingYard' False ts
 
 popOperators :: Position -> OperatorInfo -> ShuntingYard

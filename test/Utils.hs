@@ -25,14 +25,12 @@ testCalc str f unit = do
       nameE = litE $ createName vars strings
       singleTestE = appE (varE "singleTest") nameE
 
-  singleTestE $: conE "QC" $: varE "property" $: lamE args $ varE "monadicIO" $: doE [
-    bindS (varP "result") $ varE "run" $: varE "calc" $: createCalc vars strings,
-    noBindS $ caseE (varE "result") [
-      match (conP "Nothing" []) (normalB $ appE (varE "fail") $ litE "") [],
-      match (conP "Just" [varP "value"]) (
-        normalB $ varE "assert" $: showE (varE "value") ==: appE (varE "showRational") (apply f vars) ++: litE unit
+  singleTestE $: conE "QC" $: varE "property" $: lamE args $ caseE (varE "calc" $: createCalc vars strings) [
+      match (conP "Left" [varP "_"]) (normalB $ conE "False") [],
+      match (conP "Right" [varP "value"]) (
+        normalB $ showE (varE "value") ==: appE (varE "showRational") (apply f vars) ++: litE unit
       ) []
-    ]]
+    ]
 
   where
     showE = appE (varE "show")
