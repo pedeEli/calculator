@@ -9,12 +9,12 @@ import Data.Ratio (numerator, denominator, (%))
 
 import Calc.Unit (Unit(..), SIUnit, multiply, divide, _Unit, showUnit'SIUnit, showUnit'String)
 
-data Value = Value {_vBase :: Rational, _vRoot :: Integer, _vUnit :: Unit SIUnit, _vUnitOverride :: Unit String}
+data Value = Value {_vBase :: Rational, _vUnit :: Unit SIUnit, _vUnitOverride :: Unit String}
 
 $(makeLenses 'Value)
 
 instance Show Value where
-  show (Value b r u o) = showRoot r ++ showRational b ++ showUnit o u
+  show (Value b u o) = showRational b ++ showUnit o u
     where
       showUnit :: Unit String -> Unit SIUnit -> String
       showUnit (Unit []) unit = showUnit'SIUnit unit
@@ -22,56 +22,62 @@ instance Show Value where
 
 
 (<<+>>) :: Value -> Value -> Except String Value
-Value b1 r1 u1 _ <<+>> Value b2 r2 u2 _
+Value b1 u1 _ <<+>> Value b2 u2 _
   | u1 /= u2  = throwE "missmatching units"
-  | otherwise = return $ Value (applyRoot b1 r1 + applyRoot b2 r2) 1 u1 (Unit [])
+  | otherwise = return $ Value (b1 + b2) u1 (Unit [])
 
 (<<->>) :: Value -> Value -> Except String Value
-Value b1 r1 u1 _ <<->> Value b2 r2 u2 _
+Value b1 u1 _ <<->> Value b2 u2 _
   | u1 /= u2  = throwE "missmatching units"
-  | otherwise = return $ Value (applyRoot b1 r1 - applyRoot b2 r2) 1 u1 (Unit [])
+  | otherwise = return $ Value (b1 - b2) u1 (Unit [])
 
 (<<*>>) :: Value -> Value -> Except String Value
-Value b1 r1 u1 o1 <<*>> Value b2 r2 u2 o2
-  | r1 == r2  = return $ Value (b1 * b2) r1 u o
-  | otherwise = return $ Value (applyRoot b1 r1 * applyRoot b2 r2) 1 u o
-  where
-    u = multiply u1 u2
-    o = multiply o1 o2
+Value b1 u1 o1 <<*>> Value b2 u2 o2 = return $
+  Value (b1 * b2) (multiply u1 u2) (multiply o1 o2)
 
 vNegate :: Value -> Except String Value
 vNegate = return . (vBase *~ -1)
 
 (<</>>) :: Value -> Value -> Except String Value
-v1 <</>> v2 = vRecip v2 >>= (v1 <<*>>)
+Value b1 u1 o1 <</>> Value b2 u2 o2 = return $ Value (b1 / b2) (divide u1 u2) (divide o1 o2)
 
 vRecip :: Value -> Except String Value
-vRecip (Value b r u o) =
-  let n = numerator b
-      d = denominator b
-  in return $ Value (d ^ r * n ^ (r - 1) % n) r (divide (Unit []) u) (divide (Unit []) o)
+vRecip (Value b u o) = return $ Value (recip b) (divide (Unit []) u) (divide (Unit []) o)
 
 
-applyRoot :: Rational -> Integer -> Rational
-applyRoot rational root
-  | root == 1 = rational
-  | otherwise =
-    let n = numerator rational
-        d = denominator rational
-    in toRational (fromIntegral n ** (1 / fromIntegral root)) / fromIntegral d
-
+(<<^>>) :: Value -> Value -> Except String Value
+Value b1 u1 o1 <<^>> Value b2 u2 _
+  | u2 /= Unit [] = throwE "exponent cannot have any units"
+  | b1 == 0 && b2 == 0 = throwE "0^0 is undefined"
+  | b2 == 0 = return $ Value 1 (Unit []) (Unit [])
+  | b2 == 1 = return $ Value b1 u1 o1
+  | d2 == 1 = return $ Value (b1 ^ n2) (l u1) (l o1)
+  | u1 /= Unit [] = throwE "cannot take roots of units"
+  | otherwise = return $ Value (newtonsMethod (b1 ^ n2) d2) (Unit []) (Unit [])
+  where
+    n2 = numerator   b2
+    d2 = denominator b2
+    l = _Unit . mapped . _2 *~ n2
 
 
 showRational :: Rational -> String
-showRational r =
-  let n = numerator r
-      d = denominator r
-  in if d == 1
-    then show n
-    else show n ++ "/" ++ show d
+showRational r = if denominator r == 1
+  then show $ numerator r
+  else show (fromRational r :: Double)
+  -- let n = numerator r
+  --     d = denominator r
+  -- in if d == 1
+  --   then show n
+  --   else show n ++ "/" ++ show d
 
 
-showRoot :: Integer -> String
-showRoot i
-  | i == 1 = ""
-  | otherwise = show i ++ "√"
+
+newtonsMethod :: Rational -> Integer -> Rational
+newtonsMethod a n = go 5 2
+  where
+    t1 = (n - 1) % n
+    t2 = a / fromIntegral n
+
+    go :: Int -> Rational -> Rational
+    go 0 x = x
+    go i x = go (i - 1) (t1 * x + t2 / (x ^ (n - 1)))

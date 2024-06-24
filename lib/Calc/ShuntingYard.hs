@@ -28,7 +28,8 @@ buildInOperators = [
   OperatorInfo "+" 0 (flip (<<+>>)),
   OperatorInfo "-" 0 (flip (<<->>)),
   OperatorInfo "*" 1 (flip (<<*>>)),
-  OperatorInfo "/" 1 (flip (<</>>))]
+  OperatorInfo "/" 1 (flip (<</>>)),
+  OperatorInfo "^" 2 (flip (<<^>>))]
 
 data OperatorStackType =
   OperatorStackType'Operator Position OperatorInfo |

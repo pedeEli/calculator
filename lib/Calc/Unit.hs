@@ -12,7 +12,7 @@ import Control.Lens
 data SIUnit = Mass | Length | Time
   deriving (Eq, Ord)
 
-type UnitList a = [(a, Int)]
+type UnitList a = [(a, Integer)]
 newtype Unit a = Unit (UnitList a)
 
 $(makePrisms 'Unit)
@@ -73,7 +73,7 @@ divide u1 u2 = multiply u1 $ u2 & _Unit . mapped . _2 *~ -1
 
 
 
-empty :: (Unit SIUnit, Rational, (String, Int))
+empty :: (Unit SIUnit, Rational, (String, Integer))
 empty = (Unit [], 1, ("", 1))
 
 isEmpty :: (Unit SIUnit, Rational) -> Bool
@@ -81,7 +81,7 @@ isEmpty (Unit unitList, _) = null unitList
 
 
 
-unit :: Parsec String () (Unit SIUnit, Rational, (String, Int))
+unit :: Parsec String () (Unit SIUnit, Rational, (String, Integer))
 unit = do
   (symbol, Unit unitList, r) <- singleUnit
   e <- option 1 $ char '^' >> read <$> many1 digit

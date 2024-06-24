@@ -89,13 +89,13 @@ number = do
 unitWrapper :: Tokenizer TokenType
 unitWrapper = do
   (u, r, (symbol, _)) <- unit <?> "a unit"
-  return $ Token'Value (Value r 1 u (Unit []))
+  return $ Token'Value (Value r u (Unit []))
 
 value :: Tokenizer TokenType
 value = do
   n <- number
   (u, r, (symbol, _)) <- option empty $ try $ spaces *> unit
-  return $ Token'Value (Value (n * r) 1 u (Unit []))
+  return $ Token'Value (Value (n * r) u (Unit []))
 
 openingBracket :: Tokenizer TokenType
 openingBracket = choice [
@@ -117,11 +117,11 @@ cast = do
   return ts
   where
     value1, valueNot1, unitWrapper', operator' :: Tokenizer TokenType
-    value1 = char '1' >> return (Token'Value (Value 1 1 (Unit []) (Unit [])))
+    value1 = char '1' >> return (Token'Value (Value 1 (Unit []) (Unit [])))
     valueNot1 = oneOf "023456789" >> fail "only 1 is allowed"
     unitWrapper' = do
       (u, r, (symbol, e)) <- unit
-      return $ Token'Value (Value r 1 u (Unit [(symbol, e)]))
+      return $ Token'Value (Value r u (Unit [(symbol, e)]))
     operator' = choice [char '*' >> return (Token'Operator "*"), char '/' >> return (Token'Operator "/")]
 
     units = spaces *> choice (map addPosition [valueNot1, unitWrapper', value1, openingBracket, closingBracket, operator']) <* spaces
