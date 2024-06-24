@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedLists #-}
 module Calc.Token where
 
 import Text.Parsec as P
@@ -89,13 +90,13 @@ number = do
 unitWrapper :: Tokenizer TokenType
 unitWrapper = do
   (u, r, (symbol, _)) <- unit <?> "a unit"
-  return $ Token'Value (Value r u (Unit []))
+  return $ Token'Value (Value r u [])
 
 value :: Tokenizer TokenType
 value = do
   n <- number
   (u, r, (symbol, _)) <- option empty $ try $ spaces *> unit
-  return $ Token'Value (Value (n * r) u (Unit []))
+  return $ Token'Value (Value (n * r) u [])
 
 openingBracket :: Tokenizer TokenType
 openingBracket = choice [
@@ -117,7 +118,7 @@ cast = do
   return ts
   where
     value1, valueNot1, unitWrapper', operator' :: Tokenizer TokenType
-    value1 = char '1' >> return (Token'Value (Value 1 (Unit []) (Unit [])))
+    value1 = char '1' >> return (Token'Value $ Value 1 [] [])
     valueNot1 = oneOf "023456789" >> fail "only 1 is allowed"
     unitWrapper' = do
       (u, r, (symbol, e)) <- unit

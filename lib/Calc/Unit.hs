@@ -1,6 +1,7 @@
-{-# LANGUAGE RecordWildCards, TemplateHaskell, TupleSections, ScopedTypeVariables #-}
+{-# LANGUAGE RecordWildCards, TemplateHaskell, TupleSections, ScopedTypeVariables, TypeFamilies, OverloadedLists #-}
 module Calc.Unit where
 
+import GHC.Exts (IsList(..))
 import Text.Parsec
 
 import Data.List (findIndex, find, sort, sortBy, singleton)
@@ -16,6 +17,12 @@ type UnitList a = [(a, Integer)]
 newtype Unit a = Unit (UnitList a)
 
 $(makePrisms 'Unit)
+
+instance IsList (Unit a) where
+  type Item (Unit a) = (a, Integer)
+  fromList = Unit
+  toList = view _Unit
+
 
 instance Show SIUnit where
   show Length = "m"
@@ -74,7 +81,7 @@ divide u1 u2 = multiply u1 $ u2 & _Unit . mapped . _2 *~ -1
 
 
 empty :: (Unit SIUnit, Rational, (String, Integer))
-empty = (Unit [], 1, ("", 1))
+empty = ([], 1, ("", 1))
 
 isEmpty :: (Unit SIUnit, Rational) -> Bool
 isEmpty (Unit unitList, _) = null unitList

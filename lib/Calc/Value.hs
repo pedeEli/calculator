@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, OverloadedLists #-}
 module Calc.Value where
 
 
@@ -17,19 +17,19 @@ instance Show Value where
   show (Value b u o) = showRational b ++ showUnit o u
     where
       showUnit :: Unit String -> Unit SIUnit -> String
-      showUnit (Unit []) unit = showUnit'SIUnit unit
+      showUnit [] unit = showUnit'SIUnit unit
       showUnit unit      _    = showUnit'String unit
 
 
 (<<+>>) :: Value -> Value -> Except String Value
 Value b1 u1 _ <<+>> Value b2 u2 _
   | u1 /= u2  = throwE "missmatching units"
-  | otherwise = return $ Value (b1 + b2) u1 (Unit [])
+  | otherwise = return $ Value (b1 + b2) u1 []
 
 (<<->>) :: Value -> Value -> Except String Value
 Value b1 u1 _ <<->> Value b2 u2 _
   | u1 /= u2  = throwE "missmatching units"
-  | otherwise = return $ Value (b1 - b2) u1 (Unit [])
+  | otherwise = return $ Value (b1 - b2) u1 []
 
 (<<*>>) :: Value -> Value -> Except String Value
 Value b1 u1 o1 <<*>> Value b2 u2 o2 = return $
@@ -42,18 +42,18 @@ vNegate = return . (vBase *~ -1)
 Value b1 u1 o1 <</>> Value b2 u2 o2 = return $ Value (b1 / b2) (divide u1 u2) (divide o1 o2)
 
 vRecip :: Value -> Except String Value
-vRecip (Value b u o) = return $ Value (recip b) (divide (Unit []) u) (divide (Unit []) o)
+vRecip (Value b u o) = return $ Value (recip b) (divide [] u) (divide [] o)
 
 
 (<<^>>) :: Value -> Value -> Except String Value
 Value b1 u1 o1 <<^>> Value b2 u2 _
-  | u2 /= Unit [] = throwE "exponent cannot have any units"
+  | u2 /= []           = throwE "exponent cannot have any units"
   | b1 == 0 && b2 == 0 = throwE "0^0 is undefined"
-  | b2 == 0 = return $ Value 1 (Unit []) (Unit [])
-  | b2 == 1 = return $ Value b1 u1 o1
-  | d2 == 1 = return $ Value (b1 ^ n2) (l u1) (l o1)
-  | u1 /= Unit [] = throwE "cannot take roots of units"
-  | otherwise = return $ Value (newtonsMethod (b1 ^ n2) d2) (Unit []) (Unit [])
+  | b2 == 0            = return $ Value 1 [] []
+  | b2 == 1            = return $ Value b1 u1 o1
+  | d2 == 1            = return $ Value (b1 ^ n2) (l u1) (l o1)
+  | u1 /= []           = throwE "cannot take roots of units"
+  | otherwise          = return $ Value (newtonsMethod (b1 ^ n2) d2) [] []
   where
     n2 = numerator   b2
     d2 = denominator b2
