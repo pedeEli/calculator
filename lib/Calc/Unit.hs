@@ -100,7 +100,7 @@ singleUnit :: Parsec String () (String, Unit SIUnit, Rational)
 singleUnit = choice $ map (\u -> try (string $ u ^. _1) >> return u) allUnits
 
 allUnits :: [(String, Unit SIUnit, Rational)]
-allUnits = sortBy (\(a, _, _) (b, _, _) -> compare (Down a) (Down b)) $ composedUnits ++ map (_2 %~ Unit . singleton . (,1)) siUnits
+allUnits = sortBy (\(a, _, _) (b, _, _) -> compare b a) $ composedUnits ++ map (_2 %~ Unit . singleton . (,1)) siUnits
 
 siUnits :: [(String, SIUnit, Rational)]
 siUnits = [
