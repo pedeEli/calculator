@@ -23,6 +23,7 @@ data TokenType =
   deriving (Show)
 
 data Token = Token {_tType :: TokenType, _tPos :: Position}
+  deriving (Show)
 
 type Tokenizer = Parsec String ()
 
@@ -46,6 +47,8 @@ tokensAndCast :: Tokenizer ([Token], [Token])
 tokensAndCast = do
   ts <- Calc.Token.tokens
   c <- option [] cast
+  spaces
+  eof
   return (ts, c)
 
 tokens :: Tokenizer [Token]
@@ -89,7 +92,7 @@ number = do
 
 unitWrapper :: Tokenizer TokenType
 unitWrapper = do
-  (u, r, (symbol, _)) <- unit <?> "a unit"
+  (u, r, (symbol, _)) <- unit
   return $ Token'Value (Value r u [])
 
 value :: Tokenizer TokenType

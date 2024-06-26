@@ -11,12 +11,14 @@ import Control.Monad.Trans.Except (Except, tryE, runExcept, throwE)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad (when)
 
+-- import Debug.Trace
+
 calc :: String -> Either Error Value
 calc str = runExcept $ do
   (tokens, cast) <- tokenize str
-  -- liftIO $ print tokens
+  -- traceM $ show tokens
   rpn <- shuntingYard tokens
-  -- liftIO $ print rpn
+  -- traceM $ show rpn
   value <- evaluate rpn
   applyCast value cast
 
