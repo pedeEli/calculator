@@ -18,8 +18,8 @@ import Calc.Error (fromParsecError, Error, Position(..))
 data TokenType =
   Token'Value Value |
   Token'Operator String |
-  Token'OpeningBracket Char Char |
-  Token'ClosingBracket Char
+  Token'OpeningBracket |
+  Token'ClosingBracket
   deriving (Show)
 
 data Token = Token {_tType :: TokenType, _tPos :: Position}
@@ -102,12 +102,10 @@ value = do
   return $ Token'Value (Value (n * r) u [])
 
 openingBracket :: Tokenizer TokenType
-openingBracket = choice [
-  Token'OpeningBracket ')' <$> char '(',
-  Token'OpeningBracket '}' <$> char '{']
+openingBracket = char '(' >> return Token'OpeningBracket
 
 closingBracket :: Tokenizer TokenType
-closingBracket = Token'ClosingBracket <$> oneOf ")}"
+closingBracket = char ')' >> return Token'ClosingBracket
 
 operator :: Tokenizer TokenType
 operator = Token'Operator <$> many1 (oneOf "^°!\"§$%&/?`´\\*+~'#,;.:-_<>|@€") <?> "operator"
