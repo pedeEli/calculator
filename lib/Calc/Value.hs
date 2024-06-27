@@ -13,6 +13,13 @@ data Value = Value {_vBase :: Rational, _vUnit :: Unit SIUnit, _vUnitOverride ::
 
 $(makeLenses 'Value)
 
+fromRational :: Rational -> Value
+fromRational r = Value r [] []
+
+stripUnitOverride :: Value -> Value
+stripUnitOverride = vUnitOverride .~ []
+
+
 instance Show Value where
   show (Value b u o) = showRational b ++ showUnit o u
     where
@@ -63,7 +70,7 @@ Value b1 u1 o1 <<^>> Value b2 u2 _
 showRational :: Rational -> String
 showRational r = if denominator r == 1
   then show $ numerator r
-  else show (fromRational r :: Double)
+  else show (Prelude.fromRational r :: Double)
   -- let n = numerator r
   --     d = denominator r
   -- in if d == 1

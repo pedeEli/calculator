@@ -18,6 +18,7 @@ data SIUnit = Mass | Length | Time
 
 type UnitList a = [(a, Integer)]
 newtype Unit a = Unit (UnitList a)
+  deriving (Show)
 
 $(makePrisms 'Unit)
 

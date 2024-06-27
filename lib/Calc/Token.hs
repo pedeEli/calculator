@@ -10,16 +10,18 @@ import Control.Monad (when)
 import Control.Monad.Trans.Except (Except, throwE)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 
-import Calc.Unit (unit, empty, Unit(..))
-import Calc.Value (Value(..))
+import Calc.Unit (unit, empty, Unit(..), SIUnit)
 import Calc.Error (fromParsecError, Error, Position(..))
 
 
 data TokenType =
-  Token'Value Value |
+  Token'Value Rational |
+  Token'Unit (Unit SIUnit) Rational (Unit String) |
   Token'Operator String |
   Token'OpeningBracket |
-  Token'ClosingBracket
+  Token'ClosingBracket |
+  Token'CastStart |
+  Token'CastEnd
   deriving (Show)
 
 data Token = Token {_tType :: TokenType, _tPos :: Position}
@@ -27,9 +29,9 @@ data Token = Token {_tType :: TokenType, _tPos :: Position}
 
 type Tokenizer = Parsec String ()
 
-tokenize :: String -> Except Error ([Token], [Token])
+tokenize :: String -> Except Error [Token]
 tokenize str = do
-  let result = runParser tokensAndCast () "" str
+  let result = runParser Calc.Token.tokens () "" str
   case result of
     Right ts -> return ts
     Left err -> throwE $ fromParsecError err
@@ -43,23 +45,15 @@ addPosition parser = do
   return Token {_tType = token, _tPos = Position (sourceColumn start) (sourceColumn end)}
 
 
-tokensAndCast :: Tokenizer ([Token], [Token])
-tokensAndCast = do
-  ts <- Calc.Token.tokens
-  c <- option [] cast
-  spaces
-  eof
-  return (ts, c)
-
 tokens :: Tokenizer [Token]
 tokens = concat <$> many1 (spaces *> choice (implicitMult : singles) <* spaces)
   where
-    singles = map (fmap singleton . addPosition) [openingBracket, closingBracket, operator]
+    singles = map (fmap singleton . addPosition) [openingBracket, closingBracket, castStart, castEnd, operator]
 
 implicitMult :: Tokenizer [Token]
 implicitMult = do
-  ts <- many1 $ choice $ map addPosition [unitWrapper, value]
-  return $ intersperseWith f ts
+  ts <- many1 $ choice [unitWrapper, value]
+  return $ intersperseWith f $ concat ts
   where
     f :: Token -> Token -> Token
     f t1 t2 = Token (Token'Operator "*") $ Position (_pStart $ _tPos t1) (_pEnd $ _tPos t2)
@@ -90,16 +84,23 @@ number = do
         then 1 % (10 ^ read digits)
         else (10 ^ read digits) % 1
 
-unitWrapper :: Tokenizer TokenType
-unitWrapper = do
-  (u, r, (symbol, _)) <- unit
-  return $ Token'Value (Value r u [])
+unitWrapper :: Tokenizer [Token]
+unitWrapper = fmap singleton $ addPosition $ do
+  (u, r, symbol) <- unit
+  return $ Token'Unit u r [symbol]
 
-value :: Tokenizer TokenType
+value :: Tokenizer [Token]
 value = do
+  p1 <- getPosition
   n <- number
-  (u, r, (symbol, _)) <- option empty $ try $ spaces *> unit
-  return $ Token'Value (Value (n * r) u [])
+  p2 <- getPosition
+  unitMaybe <- optionMaybe unit
+  p3 <- getPosition
+  case unitMaybe of
+    Nothing -> return [Token (Token'Value n) $ Position (sourceColumn p1) (sourceColumn p2)]
+    Just (u, r, symbol) -> return [
+      Token (Token'Value n) $ Position (sourceColumn p1) (sourceColumn p2),
+      Token (Token'Unit u r [symbol]) $ Position (sourceColumn p2) (sourceColumn p3)]
 
 openingBracket :: Tokenizer TokenType
 openingBracket = char '(' >> return Token'OpeningBracket
@@ -110,7 +111,13 @@ closingBracket = char ')' >> return Token'ClosingBracket
 operator :: Tokenizer TokenType
 operator = Token'Operator <$> many1 (oneOf "^°!\"§$%&/?`´\\*+~'#,;.:-_<>|@€") <?> "operator"
 
+castStart :: Tokenizer TokenType
+castStart = char '[' >> return Token'CastStart
 
+castEnd :: Tokenizer TokenType
+castEnd = char ']' >> return Token'CastEnd
+
+{-
 cast :: Tokenizer [Token]
 cast = do
   char '['
@@ -127,6 +134,7 @@ cast = do
     operator' = choice [char '*' >> return (Token'Operator "*"), char '/' >> return (Token'Operator "/")]
 
     units = spaces *> choice (map addPosition [valueNot1, unitWrapper', value1, openingBracket, closingBracket, operator']) <* spaces
+-}
 
 
 
