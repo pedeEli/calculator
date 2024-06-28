@@ -52,11 +52,32 @@ tokens = concat <$> many1 (spaces *> choice (implicitMult : singles) <* spaces)
 
 implicitMult :: Tokenizer [Token]
 implicitMult = do
-  ts <- many1 $ choice [unitWrapper, value]
-  return $ intersperseWith f $ concat ts
+  ts <- many1 $ choice [unitWrapper, numberWrapper]
+  return $ concat $ intersperseWith f ts
   where
-    f :: Token -> Token -> Token
-    f t1 t2 = Token (Token'Operator "*") $ Position (_pStart $ _tPos t1) (_pEnd $ _tPos t2)
+    f :: [Token] -> [Token] -> [Token]
+    f t1 t2 = [Token (Token'Operator "*") $ Position (_pStart $ _tPos $ last t1) (_pEnd $ _tPos $ head t2)]
+
+    unitWrapper :: Tokenizer [Token]
+    unitWrapper = fmap singleton $ addPosition $ do
+      (u, r, symbol) <- unit
+      return $ Token'Unit u r [symbol]
+
+    numberWrapper :: Tokenizer [Token]
+    numberWrapper = do
+      p1 <- sourceColumn <$> getPosition
+      n <- number
+      p2 <- sourceColumn <$> getPosition
+      unitMaybe <- optionMaybe unit
+      p3 <- sourceColumn <$> getPosition
+      case unitMaybe of
+        Nothing -> return [Token (Token'Value n) $ Position p1 p2]
+        Just (u, r, symbol) -> return [
+          Token Token'OpeningBracket $ Position p1 p2,
+          Token (Token'Value n) $ Position p1 p2,
+          Token (Token'Operator "*") $ Position p1 p3,
+          Token (Token'Unit u r [symbol]) $ Position p2 p3,
+          Token Token'ClosingBracket $ Position p2 p3]
 
 
 number :: Tokenizer Rational
@@ -84,23 +105,6 @@ number = do
         then 1 % (10 ^ read digits)
         else (10 ^ read digits) % 1
 
-unitWrapper :: Tokenizer [Token]
-unitWrapper = fmap singleton $ addPosition $ do
-  (u, r, symbol) <- unit
-  return $ Token'Unit u r [symbol]
-
-value :: Tokenizer [Token]
-value = do
-  p1 <- getPosition
-  n <- number
-  p2 <- getPosition
-  unitMaybe <- optionMaybe unit
-  p3 <- getPosition
-  case unitMaybe of
-    Nothing -> return [Token (Token'Value n) $ Position (sourceColumn p1) (sourceColumn p2)]
-    Just (u, r, symbol) -> return [
-      Token (Token'Value n) $ Position (sourceColumn p1) (sourceColumn p2),
-      Token (Token'Unit u r [symbol]) $ Position (sourceColumn p2) (sourceColumn p3)]
 
 openingBracket :: Tokenizer TokenType
 openingBracket = char '(' >> return Token'OpeningBracket
