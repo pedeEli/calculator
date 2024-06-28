@@ -46,7 +46,7 @@ addPosition parser = do
 
 
 tokens :: Tokenizer [Token]
-tokens = concat <$> many1 (spaces *> choice (implicitMult : singles) <* spaces)
+tokens = concat <$> many1 (spaces *> choice (implicitMult : singles) <* spaces) <* eof
   where
     singles = map (fmap singleton . addPosition) [openingBracket, closingBracket, castStart, castEnd, operator]
 
