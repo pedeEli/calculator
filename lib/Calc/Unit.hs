@@ -1,24 +1,29 @@
-{-# LANGUAGE RecordWildCards, TemplateHaskell, TupleSections, ScopedTypeVariables, TypeFamilies, OverloadedLists #-}
+{-# LANGUAGE RecordWildCards, TemplateHaskell, TupleSections, ScopedTypeVariables,
+    TypeFamilies, OverloadedLists, FlexibleInstances #-}
 {-# OPTIONS_GHC -ddump-splices #-}
 module Calc.Unit where
 
-import GHC.Exts (IsList(..))
+import GHC.Exts
 import Text.Parsec
 
-import Data.List (findIndex, find, sort, sortBy, singleton)
-import Data.Ord (Down(Down))
+import Data.List
 
 import Control.Lens
 
-import Calc.UnitCreation (createDecs)
+import Calc.UnitCreation
 
 
 data SIUnit = Mass | Length | Time
   deriving (Eq, Ord)
 
+instance Show SIUnit where
+  show Length = "m"
+  show Time   = "s"
+  show Mass   = "kg"
+
+
 type UnitList a = [(a, Integer)]
 newtype Unit a = Unit (UnitList a)
-  deriving (Show)
 
 $(makePrisms 'Unit)
 
@@ -26,12 +31,6 @@ instance IsList (Unit a) where
   type Item (Unit a) = (a, Integer)
   fromList = Unit
   toList = view _Unit
-
-
-instance Show SIUnit where
-  show Length = "m"
-  show Time   = "s"
-  show Mass   = "kg"
 
 
 $(createDecs [
@@ -53,13 +52,13 @@ $(createDecs [
   ])
 
 
-showUnit'String :: Unit String -> String
-showUnit'String (Unit ul) = showUnitList id ul
+instance Show (Unit String) where
+  show (Unit ul) = showUnitList id ul
 
-showUnit'SIUnit :: Unit SIUnit -> String
-showUnit'SIUnit us = case find (\a -> us == a ^. _2 && 1 == a ^. _3) composedUnits of
-  Just (symbol, _, _) -> " " ++ symbol
-  Nothing -> showUnitList show (us ^. _Unit)
+instance Show (Unit SIUnit) where
+  show us = case find (\a -> us == a ^. _2 && 1 == a ^. _3) composedUnits of
+    Just (symbol, _, _) -> " " ++ symbol
+    Nothing -> showUnitList show (us ^. _Unit)
 
 showUnitList :: forall a. Ord a => (a -> String) -> UnitList a -> String
 showUnitList toString ul = case splitAt0 ul of

@@ -1,30 +1,39 @@
 {-# LANGUAGE ExistentialQuantification, FlexibleContexts #-}
 module Calc.RPN where
 
-import Control.Monad.Trans.Except
-import Control.Monad.IO.Class (MonadIO(liftIO))
 
-import Calc.Function (Fun, evaluateFunction)
-import Calc.Value (Value)
-import Calc.Error (Error(..), ErrorMessage(..), Position)
+import qualified Calc.Calculator as C
+import qualified Calc.Error as E
+import qualified Calc.Value as V
 
 
 data RPN =
-  RPN'Value Position Value |
-  forall f. Fun f => RPN'Function Position String f
+  Ast E.Position (C.Ast V.Value) |
+  forall f. C.Fun f => BuildIn E.Position String f
 instance Show RPN where
-  show (RPN'Value _ v) = show v
-  show (RPN'Function _ name _) = name
+  show (Ast _ v) = show v
+  show (BuildIn _ name _) = name
 
 
-evaluate :: [RPN] -> Except Error Value
+
+getPosition :: RPN -> E.Position
+getPosition (Ast    pos _)   = pos
+getPosition (BuildIn pos _ _) = pos
+
+
+rpnToPosition :: [RPN] -> E.Position
+rpnToPosition [] = mempty
+rpnToPosition rpn = getPosition (head rpn) <> getPosition (last rpn)
+
+
+evaluate :: [RPN] -> C.Calculator () V.Value
 evaluate = go []
   where
-    go :: [(Position, Value)] -> [RPN] -> Except Error Value
-    go []       [] = throwE $ Error mempty $ Message "empty input"
+    go :: [(E.Position, V.Value)] -> [RPN] -> C.Calculator () V.Value
+    go []       [] = C.throwString mempty "empty input"
     go [(_, v)] [] = return v
-    go (_ : _) [] = throwE $ Error mempty $ Message "syntax error"
-    go ds (RPN'Function pos _ f : rest) = do
-      ds' <- evaluateFunction pos ds f
+    go (_ : _) [] = C.throwString mempty "syntax error"
+    go ds (BuildIn pos _ f : rest) = do
+      ds' <- C.evaluateFunction pos ds f
       go ds' rest
-    go ds (RPN'Value pos v : rest)  = go ((pos, v) : ds) rest
+    go ds (Ast pos v : rest)  = go ((pos, v) : ds) rest

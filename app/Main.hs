@@ -1,18 +1,18 @@
 module Main where
 
-import Calc (calc)
+import Calc (calc, Calculator, runCalculator, liftIO)
 
 main :: IO ()
 main = do
   putStrLn "Rechner"
-  loop
+  runCalculator loop
 
 
 
-loop :: IO ()
+loop :: Calculator () ()
 loop = do
-  line <- getLine
-  let result = calc (line ++ "\n")
+  line <- liftIO getLine
+  result <- calc line
   case result of
-    Left err -> print err >> loop
-    Right d -> print d >> loop
+    Left err -> liftIO (print err) >> loop
+    Right d -> liftIO (print d) >> loop

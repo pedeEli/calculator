@@ -1,8 +1,8 @@
 module Calc.Error where
 
 
-import Text.Parsec.Error (errorPos, ParseError, errorMessages, showErrorMessages)
-import Text.Parsec.Pos (sourceColumn)
+import Text.Parsec.Error hiding (Message)
+import Text.Parsec.Pos
 
 
 newtype ErrorMessage = Message String

@@ -2,11 +2,10 @@
 module Calc.UnitCreation where
 
 
-import Data.Ratio ((%))
+import Data.Ratio
+import Data.List
 
 import Language.Haskell.TH
-
-import Data.List (sortBy)
 
 
 prefixes :: [(String, Integer)]
