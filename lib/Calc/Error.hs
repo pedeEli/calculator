@@ -11,7 +11,7 @@ instance Show ErrorMessage where
   show (Message str) = str
 
 
-data Position = Position {_pStart :: Int, _pEnd :: Int}
+data Position = Position {_start :: Int, _end :: Int}
 
 instance Semigroup Position where
   Position s1 e1 <> Position s2 e2 = Position (min s1 s2) (max e1 e2)
@@ -21,7 +21,7 @@ instance Show Position where
   show (Position start end) = show start ++ "-" ++ show end
 
 
-data Error = Error {_ePos :: Position, _eMessage :: ErrorMessage}
+data Error = Error {_pos :: Position, _message :: ErrorMessage}
 
 instance Show Error where
   show (Error pos message) = show pos ++ ": " ++ show message
@@ -33,4 +33,4 @@ fromParsecError :: ParseError -> Error
 fromParsecError err =
   let message = showErrorMessages "or" "unknown parse error" "expecting" "unexpected" "end of input" (errorMessages err)
       pos = sourceColumn $ errorPos err
-  in Error {_ePos = Position pos (pos + 1), _eMessage = Message message}
+  in Error {_pos = Position pos (pos + 1), _message = Message message}

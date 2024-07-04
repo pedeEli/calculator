@@ -106,15 +106,3 @@ empty = ([], 1, ("", 1))
 
 isEmpty :: (Unit SIUnit, Rational) -> Bool
 isEmpty (Unit unitList, _) = null unitList
-
-
-
-singleUnit :: Parsec String () (String, Unit SIUnit, Rational)
-singleUnit = choice $ map (\u -> try (string $ u ^. _1) >> return u) allUnits
-
-unit :: Parsec String () (Unit SIUnit, Rational, (String, Integer))
-unit = do
-  (symbol, Unit unitList, r) <- singleUnit <?> "a unit"
-  e <- option 1 $ char '^' >> read <$> many1 digit
-  let uc = Unit $ map (_2 *~ e) unitList
-  return (uc, r ^ e, (symbol, e))

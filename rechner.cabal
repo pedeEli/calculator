@@ -23,13 +23,12 @@ library
     exposed-modules:
         Calc,
         Calc.Token,
-        Calc.ShuntingYard,
-        Calc.RPN,
         Calc.Unit,
         Calc.Value,
         Calc.Error,
         Calc.UnitCreation,
-        Calc.Calculator
+        Calc.Calculator,
+        Calc.Ast
 
     -- Modules included in this library but not exported.
     -- other-modules:
