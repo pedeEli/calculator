@@ -21,16 +21,16 @@ instance Show Position where
   show (Position start end) = show start ++ "-" ++ show end
 
 
-data Error = Error {_pos :: Position, _message :: ErrorMessage}
+data Error = Error {_pos :: Position, _source :: String , _message :: ErrorMessage}
 
 instance Show Error where
-  show (Error pos message) = show pos ++ ": " ++ show message
+  show (Error pos source message) = source ++ " " ++ show pos ++ ": " ++ show message
 
 
 
 
-fromParsecError :: ParseError -> Error
-fromParsecError err =
+fromParsecError :: ParseError -> String -> Error
+fromParsecError err source =
   let message = showErrorMessages "or" "unknown parse error" "expecting" "unexpected" "end of input" (errorMessages err)
       pos = sourceColumn $ errorPos err
-  in Error {_pos = Position pos (pos + 1), _message = Message message}
+  in Error {_pos = Position pos (pos + 1), _message = Message message, _source = source}

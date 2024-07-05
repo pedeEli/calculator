@@ -44,8 +44,8 @@ shuntingYard' :: Bool -> [Token] -> ShuntingYard ()
 -- end of algorithm, everything thats still on the operator stack is pushed to output
 shuntingYard' _ [] = C.get >>= shuntingYardEnd . _operatorStack
 shuntingYard' start (t : ts) = case t of
-  Token (Value r)           pos -> handleValue r pos ts
-  Token (Unit u r symbol)   pos -> handleUnit u r symbol ts
+  Token (Value r)           pos -> handleValue pos r ts
+  Token (Unit u r symbol)   pos -> handleUnit pos u r symbol ts
   Token  OpeningBracket     pos -> handleOpeningBracket pos ts
   Token  ClosingBracket     pos -> handleClosingBracket pos ts
   Token (Operator operator) pos -> handleOperator start operator pos ts
@@ -55,14 +55,14 @@ pushOperatorToOutput :: E.Position -> String -> ShuntingYard ()
 pushOperatorToOutput pos name = do
   state <- C.get
   case _outputStack state of
-    (a : b : rest) -> C.modify (outputStack .~ (Ast.Variable name [b, a] : rest))
+    (a : b : rest) -> C.modify (outputStack .~ (Ast.Variable pos name [b, a] : rest))
     _ -> C.throwString pos "not enough argmuents"
 
-pushVariableToOutput :: String -> Int -> ShuntingYard ()
-pushVariableToOutput name i = do
+pushVariableToOutput :: E.Position -> String -> Int -> ShuntingYard ()
+pushVariableToOutput pos name i = do
   state <- C.get
   let (args, rest) = splitAt i (_outputStack state)
-  C.modify (outputStack .~ Ast.Variable name (reverse args) : rest)
+  C.modify (outputStack .~ Ast.Variable pos name (reverse args) : rest)
 
 
 incrementStackHead :: ShuntingYard ()
@@ -81,8 +81,8 @@ handleVariable pos name ts = do
   shuntingYard' False ts
   where
     go :: [OperatorStackType] -> ShuntingYard ()
-    go (Op'Variable _ _ _ : _) = do
-      C.modify (outputStack %:~ Ast.Variable name [])
+    go (Op'Variable pos _ _ : _) = do
+      C.modify (outputStack %:~ Ast.Variable pos name [])
       incrementStackHead
     go _ = C.modify (operatorStack %:~ Op'Variable pos name 0)
 
@@ -97,8 +97,8 @@ handleClosingBracket pos ts = do
     go (Op'Operator pos name : rest) = do
       pushOperatorToOutput pos name
       go rest
-    go (Op'Variable _ name i : rest) = do
-      pushVariableToOutput name i
+    go (Op'Variable pos name i : rest) = do
+      pushVariableToOutput pos name i
       go rest
     go (Op'OpeningBracket _ : rest) = C.modify (operatorStack .~ rest)
 
@@ -107,18 +107,18 @@ handleOpeningBracket pos ts = do
   C.modify (operatorStack %:~ Op'OpeningBracket pos)
   shuntingYard' False ts
 
-handleUnit :: U.Unit U.SIUnit -> Rational -> U.Unit String -> [Token] -> ShuntingYard ()
-handleUnit u r symbol ts = do
-  C.modify (outputStack %:~ Ast.Value (V.Value r u symbol))
+handleUnit :: E.Position -> U.Unit U.SIUnit -> Rational -> U.Unit String -> [Token] -> ShuntingYard ()
+handleUnit pos u r symbol ts = do
+  C.modify (outputStack %:~ Ast.Value pos (V.Value r u symbol))
   shuntingYard' False ts
 
-handleValue :: Rational -> E.Position -> [Token] -> ShuntingYard ()
-handleValue r pos ts = do
+handleValue :: E.Position -> Rational -> [Token] -> ShuntingYard ()
+handleValue pos r ts = do
   state <- C.get
   when (_isCast state && r /= 1) $
     C.throwString pos "only number 1 is allowed in cast"
   let mapper = if _isCast state then id else V.stripUnitOverride
-  C.modify (outputStack %:~ Ast.Value (mapper $ V.fromRational r))
+  C.modify (outputStack %:~ Ast.Value pos (mapper $ V.fromRational r))
   incrementStackHead
   shuntingYard' False ts
 
@@ -139,7 +139,7 @@ handleOperator start name pos ts = do
     go [] = C.modify (operatorStack .~ [Op'Operator pos name])
     go stack@(Op'OpeningBracket _ : _) = C.modify (operatorStack .~ Op'Operator pos name : stack)
     go (Op'Variable pos name i : rest) = do
-      pushVariableToOutput name i
+      pushVariableToOutput pos name i
       go rest
     go stack@(Op'Operator pos op : rest) = do
       p1 <- C.getPrecedence op
@@ -156,8 +156,8 @@ shuntingYardEnd (Op'OpeningBracket pos : _) = C.throwString pos "missing closing
 shuntingYardEnd (Op'Operator pos name : rest) = do
   pushOperatorToOutput pos name
   shuntingYardEnd rest
-shuntingYardEnd (Op'Variable _ name i : rest) = do
-  pushVariableToOutput name i
+shuntingYardEnd (Op'Variable pos name i : rest) = do
+  pushVariableToOutput pos name i
   shuntingYardEnd rest
 
 shuntingYard :: Bool -> [Token] -> C.Calculator a (Ast.Ast V.Value)
@@ -177,19 +177,22 @@ mapTokenizer tokenizer str = do
   result <- runParserT (tokenizer <* eof) () "" str
   case result of
     Right t -> return t
-    Left err -> throwE $ E.fromParsecError err
+    Left err -> throwE $ E.fromParsecError err str
 
 expression :: String -> C.Calculator () (Ast.Ast V.Value)
 expression = mapTokenizer $ expr
 
-definition :: String -> C.Calculator () (Ast.Ast ())
+definition :: String -> C.Calculator () (String -> Ast.Ast ())
 definition = mapTokenizer $ do
   (name, args) <- try operatorDef <|> variableDef
   spaces
+  start <- getPosition
   char '='
+  end <- getPosition
   spaces
   expr <- expr
-  return $ Ast.Definition name args expr
+  let pos = E.Position (sourceColumn start) (sourceColumn end)
+  return $ \source -> Ast.Definition pos source name args expr
   where
     operatorDef :: Tokenizer (String, [String])
     operatorDef = do
@@ -213,14 +216,18 @@ expr = do
   maybeCast <- optionMaybe cast
   case maybeCast of
     Nothing -> return ast
-    Just castValue -> return $ Ast.Cast ast castValue
+    Just (pos, castValue) -> return $ Ast.Cast pos ast castValue
 
-cast :: Tokenizer (Ast.Ast V.Value)
+cast :: Tokenizer (E.Position, Ast.Ast V.Value)
 cast = do
+  start <- getPosition
   char '['
   ts <- tokenize
   char ']'
-  lift $ shuntingYard True ts
+  end <- getPosition
+  let pos = E.Position (sourceColumn start) (sourceColumn end)
+  ast <- lift $ shuntingYard True ts
+  return (pos, ast)
 
 
 

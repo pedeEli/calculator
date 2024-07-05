@@ -18,6 +18,7 @@ import qualified Calc.Error as E
 import qualified Calc.Value as V
 import qualified Calc.Ast as Ast
 
+-- import Debug.Trace
 
 type Calculator s = ExceptT E.Error (S.StateT (CalcState s) IO)
 
@@ -54,9 +55,10 @@ data BuildIn = forall f. Fun f => BuildIn f
 
 data CalcState s = CalcState {
   _state :: s,
+  _source :: String,
   _precedences :: M.Map String Int,
   _buildIns :: M.Map String BuildIn,
-  _asts :: M.Map String ([String], Ast.Ast V.Value)}
+  _asts :: M.Map String (String, [String], Ast.Ast V.Value)}
 $(makeLenses 'CalcState)
 
 
@@ -87,6 +89,7 @@ buildInPrecedences = M.fromList [
 defaultState :: CalcState ()
 defaultState = CalcState {
   _state = (),
+  _source = "",
   _precedences = buildInPrecedences,
   _buildIns = buildInOperators,
   _asts = mempty}
@@ -111,27 +114,35 @@ getBuildIn name = do
   state <- lift S.get
   return $ _buildIns state M.!? name
 
-getVariable :: String -> Calculator () (Maybe ([String], Ast.Ast V.Value))
+getVariable :: String -> Calculator () (Maybe (String, [String], Ast.Ast V.Value))
 getVariable name = do
   state <- lift S.get
   return $ _asts state M.!? name
 
 
-addAst :: String -> [String] -> Ast.Ast V.Value -> Calculator s ()
-addAst name args ast = lift $ S.modify $ asts %~ M.insert name (args, ast)
+addAst :: String -> String -> [String] -> Ast.Ast V.Value -> Calculator s ()
+addAst name source args ast = lift $ S.modify $ asts %~ M.insert name (source, args, ast)
 
-getAsts :: Calculator s (M.Map String ([String], Ast.Ast V.Value))
+getAsts :: Calculator s (M.Map String (String, [String], Ast.Ast V.Value))
 getAsts = _asts <$> lift S.get
 
-putAsts :: M.Map String ([String], Ast.Ast V.Value) -> Calculator s ()
+putAsts :: M.Map String (String, [String], Ast.Ast V.Value) -> Calculator s ()
 putAsts = lift . S.modify . set asts
+
+getSource :: Calculator s String
+getSource = _source <$> lift S.get
+
+putSource :: String -> Calculator s ()
+putSource = lift . S.modify . set source
 
 
 throwError :: E.Error -> Calculator s a
 throwError = throwE
 
 throwString :: E.Position -> String -> Calculator s a
-throwString pos = throwE . E.Error pos . E.Message
+throwString pos message = do
+  source <- getSource
+  throwE $ E.Error pos source $ E.Message message
 
 
 replaceState :: Calculator s b -> s -> Calculator s' b
@@ -149,52 +160,62 @@ try :: Calculator s a -> Calculator s (Either E.Error a)
 try = tryE
 
 
-evaluateFunction :: forall f. Fun f => E.Position -> [(E.Position, V.Value)] -> f -> Calculator () [(E.Position, V.Value)]
-evaluateFunction pos ds f = case witness @f @(CountArgs f) of
-  FunctionNil -> (:[]) . (pos,) <$> f
-  FunctionFun -> case ds of
-    [] -> throwString pos "too few arguments to function"
-    ((p, d) : rest) -> evaluateFunction (pos <> p) rest $ f d
-
-evaluateFunction' :: forall f. Fun f => [V.Value] -> f -> Calculator () V.Value
-evaluateFunction' values f = case witness @f @(CountArgs f) of
-  FunctionNil -> if null values then f
-    else throwString mempty "to many arguments for function"
+evaluateFunction :: forall f. Fun f => E.Position -> [(E.Position, V.Value)] -> f -> Calculator () (E.Position, V.Value)
+evaluateFunction pos values f = case witness @f @(CountArgs f) of
+  FunctionNil -> if null values then (pos,) <$> f
+    else throwString (mconcat $ map fst values) "to many arguments for function"
   FunctionFun -> case values of
-    [] -> throwString mempty "too few arguments for function"
-    (value : rest) -> evaluateFunction' rest (f value)
+    [] -> throwString pos "too few arguments for function"
+    ((p, value) : rest) -> evaluateFunction (pos <> p) rest (f value)
 
 
-evaluate :: Ast.Ast t -> Calculator () t
-evaluate (Ast.Value v) = return v
-evaluate (Ast.Definition name args ast) = addAst name args ast
-evaluate (Ast.Cast valueAst castAst) = do
-  value <- evaluate valueAst
-  cast <- evaluate castAst
+evaluate :: Ast.Ast t -> Calculator () (E.Position, t)
+evaluate (Ast.Value pos v) = return (pos, v)
+evaluate (Ast.Definition pos source name args ast) = do
+  addAst name source args ast
+  return (pos, ())
+evaluate (Ast.Cast pos valueAst castAst) = do
+  (valuePos, value) <- evaluate valueAst
+  (castPos, cast) <- evaluate castAst
   when (V._vUnit value /= V._vUnit cast) $
-    throwString mempty "missmatched units in cast"
-  return $ value & V.vBase //~ V._vBase cast & V.vUnitOverride .~ V._vUnitOverride cast
-evaluate (Ast.Variable name args) = do
+    throwString pos "missmatched units in cast"
+  return (valuePos <> castPos, value & V.vBase //~ V._vBase cast & V.vUnitOverride .~ V._vUnitOverride cast)
+evaluate (Ast.Variable pos name args) = do
   buildIn <- getBuildIn name
   case buildIn of
     Just (BuildIn f) -> do
       args' <- mapM evaluate args
-      evaluateFunction' args' f
+      evaluateFunction pos args' f
     Nothing -> do
       variable <- getVariable name
       case variable of
-        Nothing -> throwString mempty "unknown variable"
-        Just (argNames, ast) -> do
-          backup <- getAsts
-          setArgs argNames args
+        Nothing -> throwString pos "unknown variable"
+        Just (source, argNames, ast) -> do
+          astsBackup <- getAsts
+          setArgs pos argNames args
+          sourceBackup <- getSource
+          putSource source
           result <- evaluate ast
-          putAsts backup
+          putSource sourceBackup
+          putAsts astsBackup
           return result
   where
-    setArgs :: [String] -> [Ast.Ast V.Value] -> Calculator () ()
-    setArgs [] [] = return ()
-    setArgs [] _ = throwString mempty "too many argumets for functions"
-    setArgs _ [] = throwString mempty "too few argumets for functions"
-    setArgs (name : names) (value : values) = do
-      addAst name [] value
-      setArgs names values
+    setArgs :: E.Position -> [String] -> [Ast.Ast V.Value] -> Calculator () ()
+    setArgs pos [] [] = return ()
+    setArgs pos [] _ = throwString pos "too many argumets for function"
+    setArgs pos _ [] = throwString pos "too few argumets for function"
+    setArgs pos (name : names) (value : values) = do
+      go name value
+      setArgs pos names values
+
+    go :: String -> Ast.Ast V.Value -> Calculator () ()
+    go name ast@(Ast.Variable pos varName _) = do
+      variable <- getVariable varName
+      case variable of
+        Nothing -> throwString pos "unknown variable"
+        Just (source, args, ast) -> do
+          backup <- getSource
+          putSource source
+          addAst name "" args ast
+          putSource source
+    go name ast = addAst name "" [] ast

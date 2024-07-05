@@ -15,10 +15,11 @@ import Debug.Trace
 
 calc :: String -> C.Calculator () (Either E.Error V.Value)
 calc str = C.try $ do
+  C.putSource str
   output <- C.try $ T.expression str
   case output of
-    Right value -> C.evaluate value
+    Right value -> snd <$> C.evaluate value
     Left _ -> do
       output <- T.definition str
-      C.evaluate output
+      C.evaluate (output str)
       return $ V.fromRational 0
