@@ -28,7 +28,21 @@ library
         Calc.Error,
         Calc.UnitCreation,
         Calc.Calculator,
-        Calc.Ast
+
+        Language.Calc.Syntax.Expr,
+        Language.Calc.Syntax.Lit,
+        Language.Calc.Syntax.Decl,
+        Language.Calc.Syntax.Extension,
+
+        GCI.Parser.Expr,
+        GCI.Parser.Decl,
+        GCI.Parser.Lexer,
+
+        GCI.Types.SrcLoc,
+
+        GCI.Calc.Expr,
+        GCI.Calc.Decl,
+        GCI.Calc.Extension
 
     -- Modules included in this library but not exported.
     -- other-modules:

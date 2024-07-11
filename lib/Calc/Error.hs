@@ -34,3 +34,7 @@ fromParsecError err source =
   let message = showErrorMessages "or" "unknown parse error" "expecting" "unexpected" "end of input" (errorMessages err)
       pos = sourceColumn $ errorPos err
   in Error {_pos = Position pos (pos + 1), _message = Message message, _source = source}
+
+
+class WithPos a where
+  getPosition :: a -> Position

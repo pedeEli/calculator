@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell, FlexibleContexts, ConstraintKinds, MultiParamTypeClasses, FlexibleInstances,
     ScopedTypeVariables, StandaloneKindSignatures, TypeApplications, TupleSections, GADTs, DataKinds, TypeFamilies #-}
+{-# OPTIONS_GHC -Wall #-}
 module Calc.Calculator where
 
 
@@ -16,9 +17,8 @@ import Data.Maybe
 
 import qualified Calc.Error as E
 import qualified Calc.Value as V
-import qualified Calc.Ast as Ast
 
--- import Debug.Trace
+import Debug.Trace
 
 type Calculator s = ExceptT E.Error (S.StateT (CalcState s) IO)
 
@@ -50,32 +50,58 @@ instance Function (Calculator () V.Value) 'Zero where
   witness = FunctionNil
 
 
+data Toplevel =
+  Expression Expr |
+  Definition String [String] Expr
+  deriving (Show)
+data Expr =
+  Literal V.Value |
+  Cast Expr Expr |
+  Variable String |
+  Application Expr Expr
+  deriving (Show)
 
-data BuildIn = forall f. Fun f => BuildIn f
+data Variable =
+  Value E.Position (Calculator () Expr) |
+  Lambda E.Position String Variable
+instance E.WithPos Variable where
+  getPosition (Value pos _) = pos
+  getPosition (Lambda pos _ _) = pos
+
+
+
+type Clousure = M.Map String (String, Variable)
 
 data CalcState s = CalcState {
   _state :: s,
   _source :: String,
   _precedences :: M.Map String Int,
-  _buildIns :: M.Map String BuildIn,
-  _asts :: M.Map String (String, [String], Ast.Ast V.Value)}
+  _clousure :: Clousure,
+  _clousures :: [Clousure]}
 $(makeLenses 'CalcState)
 
 
-mapOperator :: (V.Value -> V.Value -> Except String V.Value) -> V.Value -> V.Value -> Calculator () V.Value
-mapOperator operator a b =
-  let result = runExcept $ operator a b
-  in case result of
-    Left err -> throwString mempty err
-    Right value -> return value
+mapOperator :: (V.Value -> V.Value -> Except String V.Value) -> (String, Variable)
+mapOperator operator = ("", res)
+  where
+    res :: Variable
+    res = Lambda mempty "a" $ Lambda mempty "b" $ Value mempty $ do
+      (_, aResult) <- getVariable mempty "a"
+      (_, bResult) <- getVariable mempty "b"
+      (_, aValue) <- variableToValue aResult
+      (_, bValue) <- variableToValue bResult
+      let result = runExcept $ operator aValue bValue
+      case result of
+        Left err -> throwString mempty err
+        Right value -> return $ Literal value
 
-buildInOperators :: M.Map String BuildIn
+buildInOperators :: Clousure
 buildInOperators = M.fromList [
-  ("+", BuildIn $ mapOperator (V.<<+>>)),
-  ("-", BuildIn $ mapOperator (V.<<->>)),
-  ("*", BuildIn $ mapOperator (V.<<*>>)),
-  ("/", BuildIn $ mapOperator (V.<</>>)),
-  ("^", BuildIn $ mapOperator (V.<<^>>))]
+  ("+", mapOperator (V.<<+>>)),
+  ("-", mapOperator (V.<<->>)),
+  ("*", mapOperator (V.<<*>>)),
+  ("/", mapOperator (V.<</>>)),
+  ("^", mapOperator (V.<<^>>))]
 
 buildInPrecedences :: M.Map String Int
 buildInPrecedences = M.fromList [
@@ -91,8 +117,8 @@ defaultState = CalcState {
   _state = (),
   _source = "",
   _precedences = buildInPrecedences,
-  _buildIns = buildInOperators,
-  _asts = mempty}
+  _clousure = buildInOperators,
+  _clousures = []}
 
 runCalculator :: Calculator () a -> IO ()
 runCalculator c = void $ S.evalStateT (runExceptT c) defaultState
@@ -109,25 +135,27 @@ getPrecedence name = do
   ps <- _precedences <$> lift S.get
   return $ fromMaybe 9 $ ps M.!? name
 
-getBuildIn :: String -> Calculator () (Maybe BuildIn)
-getBuildIn name = do
+getVariable :: E.Position -> String -> Calculator () (String, Variable)
+getVariable pos name = do
   state <- lift S.get
-  return $ _buildIns state M.!? name
+  case _clousure state M.!? name of
+    Nothing -> throwString pos "unknown variable"
+    Just variable -> return variable
 
-getVariable :: String -> Calculator () (Maybe (String, [String], Ast.Ast V.Value))
-getVariable name = do
-  state <- lift S.get
-  return $ _asts state M.!? name
+addVariable :: String -> String -> Variable -> Calculator s ()
+addVariable source name variable = lift $ S.modify $ clousure %~ M.insert name (source, variable)
 
+pushClousure :: Calculator s ()
+pushClousure = do
+  clousure <- _clousure <$> lift S.get
+  lift $ S.modify (clousures %~ (clousure :))
 
-addAst :: String -> String -> [String] -> Ast.Ast V.Value -> Calculator s ()
-addAst name source args ast = lift $ S.modify $ asts %~ M.insert name (source, args, ast)
-
-getAsts :: Calculator s (M.Map String (String, [String], Ast.Ast V.Value))
-getAsts = _asts <$> lift S.get
-
-putAsts :: M.Map String (String, [String], Ast.Ast V.Value) -> Calculator s ()
-putAsts = lift . S.modify . set asts
+popClousure :: Calculator s ()
+popClousure = do
+  cs <- _clousures <$> lift S.get
+  case cs of
+    [] -> return ()
+    (c : rest) -> lift $ S.modify $ (clousure .~ c) . (clousures .~ rest)
 
 getSource :: Calculator s String
 getSource = _source <$> lift S.get
@@ -169,53 +197,36 @@ evaluateFunction pos values f = case witness @f @(CountArgs f) of
     ((p, value) : rest) -> evaluateFunction (pos <> p) rest (f value)
 
 
-evaluate :: Ast.Ast t -> Calculator () (E.Position, t)
-evaluate (Ast.Value pos v) = return (pos, v)
-evaluate (Ast.Definition pos source name args ast) = do
-  addAst name source args ast
-  return (pos, ())
-evaluate (Ast.Cast pos valueAst castAst) = do
-  (valuePos, value) <- evaluate valueAst
-  (castPos, cast) <- evaluate castAst
-  when (V._vUnit value /= V._vUnit cast) $
-    throwString pos "missmatched units in cast"
-  return (valuePos <> castPos, value & V.vBase //~ V._vBase cast & V.vUnitOverride .~ V._vUnitOverride cast)
-evaluate (Ast.Variable pos name args) = do
-  buildIn <- getBuildIn name
-  case buildIn of
-    Just (BuildIn f) -> do
-      args' <- mapM evaluate args
-      evaluateFunction pos args' f
-    Nothing -> do
-      variable <- getVariable name
-      case variable of
-        Nothing -> throwString pos "unknown variable"
-        Just (source, argNames, ast) -> do
-          astsBackup <- getAsts
-          setArgs pos argNames args
-          sourceBackup <- getSource
-          putSource source
-          result <- evaluate ast
-          putSource sourceBackup
-          putAsts astsBackup
-          return result
-  where
-    setArgs :: E.Position -> [String] -> [Ast.Ast V.Value] -> Calculator () ()
-    setArgs pos [] [] = return ()
-    setArgs pos [] _ = throwString pos "too many argumets for function"
-    setArgs pos _ [] = throwString pos "too few argumets for function"
-    setArgs pos (name : names) (value : values) = do
-      go name value
-      setArgs pos names values
+evaluate :: Expr -> Calculator () (E.Position, t)
+evaluate = undefined
+-- evaluate (Definition pos source name ast) = do
+--   addVariable source name ast
+--   return (pos, ())
+-- evaluate (Literal pos v) = return (pos, v)
+-- evaluate (Cast pos valueAst castAst) = do
+--   (valuePos, value) <- evaluate valueAst
+--   (castPos, cast) <- evaluate castAst
+--   when (V._vUnit value /= V._vUnit cast) $
+--     throwString pos "missmatched units in cast"
+--   return (valuePos <> castPos, value & V.vBase //~ V._vBase cast & V.vUnitOverride .~ V._vUnitOverride cast)
+-- evaluate (Variable pos name) = do
+--   (source, result) <- getVariable pos name
+--   putSource source
+--   return (pos, result)
+-- evaluate (BuildIn c) = (mempty,) <$> c
+-- evaluate (Application pos left right) = do
+--   (leftPos, name, result) <- resultToLambda left
+--   pushClousure
+--   addVariable "" name right
+  
+--   popClousure
+--   _
 
-    go :: String -> Ast.Ast V.Value -> Calculator () ()
-    go name ast@(Ast.Variable pos varName _) = do
-      variable <- getVariable varName
-      case variable of
-        Nothing -> throwString pos "unknown variable"
-        Just (source, args, ast) -> do
-          backup <- getSource
-          putSource source
-          addAst name "" args ast
-          putSource source
-    go name ast = addAst name "" [] ast
+
+variableToValue :: Variable -> Calculator () (E.Position, V.Value)
+variableToValue (Lambda pos _ _) = throwString pos "expected a value"
+variableToValue (Value _ expr) = expr >>= evaluate
+
+variableToLambda :: Variable -> Calculator () (E.Position, String, Variable)
+variableToLambda (Value pos _) = throwString pos "expected a function"
+variableToLambda (Lambda pos name variable) = return (pos, name, variable)
