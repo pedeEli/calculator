@@ -38,11 +38,19 @@ library
         GCI.Parser.Decl,
         GCI.Parser.Lexer,
 
+        GCI.Renamer.Types,
+        GCI.Renamer.Expr,
+        GCI.Renamer.Decl,
+        GCI.Renamer.Lit,
+
         GCI.Types.SrcLoc,
 
         GCI.Calc.Expr,
         GCI.Calc.Decl,
-        GCI.Calc.Extension
+        GCI.Calc.Lit,
+        GCI.Calc.Extension,
+
+        GCI.Test
 
     -- Modules included in this library but not exported.
     -- other-modules:

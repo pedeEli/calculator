@@ -40,10 +40,7 @@ infixExp' operator exp = do
     return (op, exp2)
   return $ case result of
     Nothing -> exp1
-    Just (op, exp2) -> case exp2 of
-      L loc1 (CalcOpApp _ exp3 op2 exp4) -> L loc1 $
-        CalcOpApp noExtField (mkCalcOpApp op exp1 exp3) op2 exp4
-      _ -> mkCalcOpApp op exp1 exp2
+    Just (op, exp2) -> mkCalcOpApp exp1 op exp2
 
 infixExp :: Parsec String () (Located (CalcExpr CalcPs))
 infixExp = infixExp' operator fexp
@@ -116,10 +113,8 @@ castvalexp = do
   return $ mkCalcRational one
 
 
-mkCalcOpApp :: Located String -> LCalcExpr CalcPs -> LCalcExpr CalcPs -> LCalcExpr CalcPs
-mkCalcOpApp op e1 e2 = addCLoc e1 e2 $ CalcOpApp noExtField e1 op' e2
-  where
-    op' = L (getLoc op) $ CalcVar noExtField op
+mkCalcOpApp :: LCalcExpr CalcPs -> Located String -> LCalcExpr CalcPs -> LCalcExpr CalcPs
+mkCalcOpApp e1 op e2 = addCLoc e1 e2 $ CalcOpApp noExtField e1 op e2
 
 mkCalcRational :: Located Rational -> LCalcExpr CalcPs
 mkCalcRational = fmap (CalcLit noExtField . CalcRational noExtField)

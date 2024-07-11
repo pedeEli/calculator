@@ -13,7 +13,7 @@ data CalcExpr p =
   CalcLam (XLam p) (LIdP p) (LCalcExpr p) |
   CalcApp (XApp p) (LCalcExpr p) (LCalcExpr p) |
   CalcNegApp (XNegApp p) (LCalcExpr p) |
-  CalcOpApp (XOpApp p) (LCalcExpr p) (LCalcExpr p) (LCalcExpr p) |
+  CalcOpApp (XOpApp p) (LCalcExpr p) (LIdP p) (LCalcExpr p) |
   CalcPar (XPar p) (LCalcExpr p) |
   CalcImpMult (XImpMult p) (LCalcExpr p) (LCalcExpr p) |
   CalcCast (XCast p) (LCalcExpr p) (LCalcExpr p) |
