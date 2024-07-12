@@ -1,7 +1,9 @@
 module GCI.Renamer.Expr where
 
+  
+import Data.Maybe
+
 import Language.Calc.Syntax.Expr
-import Language.Calc.Syntax.Lit
 import Language.Calc.Syntax.Extension
 
 import GCI.Calc.Extension
@@ -11,7 +13,7 @@ import GCI.Renamer.Types
 import GCI.Renamer.Lit
 
 import GCI.Types.SrcLoc
-import Data.Maybe (fromMaybe)
+import GCI.Types.Names
 
 
 renameExpression :: LCalcExpr CalcPs -> Rn (LCalcExpr CalcRn)
@@ -31,9 +33,9 @@ renameExpression (L loc exp) = L loc <$> case exp of
 renameVar :: LIdP CalcPs -> Rn (CalcExpr CalcRn)
 renameVar name = do
   uname <- getName $ unLoc name
-  return $ CalcVar noExtField $ case uname of
-    Nothing -> name
-    Just uname -> L (getLoc name) uname
+  case uname of
+    Nothing -> reportError $ "unknown variable " ++ unLoc name
+    Just uname -> return $ CalcVar noExtField $ L (getLoc name) uname
 
 renameLam :: LIdP CalcPs -> LCalcExpr CalcPs -> Rn (CalcExpr CalcRn)
 renameLam name exp_ps = do
@@ -53,10 +55,13 @@ renameApp left_ps right_ps = do
 renameOpApp :: LCalcExpr CalcPs -> LIdP CalcPs -> LCalcExpr CalcPs -> Rn (CalcExpr CalcRn)
 renameOpApp left_ps op_ps right_ps = do
   left_rn <- renameExpression left_ps
-  op_rn <- fromMaybe (unLoc op_ps) <$> getName (unLoc op_ps)
-  right_rn <- renameExpression right_ps
-  fix <- getFixity op_rn
-  return $ mkOpApp fix left_rn (L (getLoc op_ps) op_rn) right_rn
+  op_rn <- getName $ unLoc op_ps
+  case op_rn of
+    Nothing -> reportError $ "unknown variable " ++ unLoc op_ps
+    Just op_rn -> do
+      right_rn <- renameExpression right_ps
+      fix <- getFixity op_rn
+      return $ mkOpApp fix left_rn (L (getLoc op_ps) op_rn) right_rn
 
 renameImpMult :: LCalcExpr CalcPs -> LCalcExpr CalcPs -> Rn (CalcExpr CalcRn)
 renameImpMult left_ps right_ps = do
@@ -72,7 +77,7 @@ renameCast left_ps right_ps = do
 
 
 
-mkOpApp :: Fixity -> LCalcExpr CalcRn -> Located String -> LCalcExpr CalcRn -> CalcExpr CalcRn
+mkOpApp :: Fixity -> LCalcExpr CalcRn -> Located Unique -> LCalcExpr CalcRn -> CalcExpr CalcRn
 mkOpApp fix1 e1 op1 e2@(L _ (CalcOpApp fix2 e2_1 op2 e2_2))
   | fix2 > fix1 = CalcOpApp fix1 e1 op1 e2
   | otherwise   = CalcOpApp fix2 (addCLoc e1 e2_1 $ CalcOpApp fix1 e1 op1 e2_1) op2 e2_2

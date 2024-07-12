@@ -16,4 +16,5 @@ import GCI.Types.SrcLoc
 renameDeclaration :: LCalcDecl CalcPs -> Rn (LCalcDecl CalcRn)
 renameDeclaration (L loc (ValD _ name exp_ps)) = do
   exp_rn <- renameExpression exp_ps
-  return $ L loc $ ValD noExtField name exp_rn
+  uname <- mkUniqueName $ unLoc name
+  return $ L loc $ ValD noExtField (L (getLoc name) uname) exp_rn

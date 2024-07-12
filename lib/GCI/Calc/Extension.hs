@@ -6,6 +6,7 @@ import Data.Kind
 import Language.Calc.Syntax.Extension
 
 import GCI.Types.SrcLoc
+import GCI.Types.Names
 
 
 data Pass = Parsed | Renamed | Typechecked
@@ -29,5 +30,5 @@ type instance IdP (CalcPass p) = IdCalcP p
 type IdCalcP :: Pass -> Type
 type family IdCalcP p where
   IdCalcP 'Parsed = String
-  IdCalcP 'Renamed = String
-  IdCalcP 'Typechecked = String
+  IdCalcP 'Renamed = Unique
+  IdCalcP 'Typechecked = Unique

@@ -43,7 +43,12 @@ library
         GCI.Renamer.Decl,
         GCI.Renamer.Lit,
 
+        GCI.Typechecker.Expr,
+        GCI.Typechecker.Decl,
+        GCI.Typechecker.Lit,
+
         GCI.Types.SrcLoc,
+        GCI.Types.Names,
 
         GCI.Calc.Expr,
         GCI.Calc.Decl,

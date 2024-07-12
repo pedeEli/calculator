@@ -15,24 +15,50 @@ import GCI.Types.SrcLoc
 
 
 
-type instance XVar (CalcPass _) = NoExtField
-type instance XLit (CalcPass _) = NoExtField
-type instance XLam (CalcPass _) = NoExtField
-type instance XApp (CalcPass _) = NoExtField
+type instance XVar CalcPs = NoExtField
+type instance XVar CalcRn = NoExtField
+type instance XVar CalcTc = Type
+
+type instance XLit CalcPs = NoExtField
+type instance XLit CalcRn = NoExtField
+type instance XLit CalcTc = Type
+
+type instance XLam CalcPs = NoExtField
+type instance XLam CalcRn = NoExtField
+type instance XLam CalcTc = Type
+
+type instance XApp CalcPs = NoExtField
+type instance XApp CalcRn = NoExtField
+type instance XApp CalcTc = Type
 
 type instance XOpApp CalcPs = NoExtField
 type instance XOpApp CalcRn = Fixity
-type instance XOpApp CalcTc = NoExtField
+type instance XOpApp CalcTc = Type
 
-type instance XNegApp (CalcPass _) = NoExtField
-type instance XPar (CalcPass _) = NoExtField
-type instance XImpMult (CalcPass _) = NoExtField
-type instance XCast (CalcPass _) = NoExtField
-type instance XExpr (CalcPass _) = DataConCantHappen
+type instance XNegApp CalcPs = NoExtField
+type instance XNegApp CalcRn = NoExtField
+type instance XNegApp CalcTc = Type
+
+type instance XPar CalcPs = NoExtField
+type instance XPar CalcRn = NoExtField
+type instance XPar CalcTc = Type
+
+type instance XImpMult CalcPs = NoExtField
+type instance XImpMult CalcRn = NoExtField
+type instance XImpMult CalcTc = Type
+
+type instance XCast CalcPs = NoExtField
+type instance XCast CalcRn = NoExtField
+type instance XCast CalcTc = Type
+
+type instance XExpr CalcPs = DataConCantHappen
+type instance XExpr CalcRn = DataConCantHappen
+type instance XExpr CalcTc = DataConCantHappen
 
 
 
-instance {-# OVERLAPS #-} Show (IdP (CalcPass p)) => Show (CalcExpr (CalcPass p)) where
+instance {-# OVERLAPS #-} (
+  Show (IdP (CalcPass p)), Show (XExpr (CalcPass p))) => Show (CalcExpr (CalcPass p)) where
   show (CalcVar _ id) = show (unLoc id)
   show (CalcLit _ lit) = show lit
   show (CalcLam _ id exp) = "(\\" ++ show (unLoc id) ++ " -> " ++ show (unLoc exp) ++ ")"
@@ -43,3 +69,16 @@ instance {-# OVERLAPS #-} Show (IdP (CalcPass p)) => Show (CalcExpr (CalcPass p)
   show (CalcImpMult _ left right) = "(" ++ show (unLoc left) ++ show (unLoc right) ++ ")"
   show (CalcCast _ exp cast) = show (unLoc exp) ++ " [" ++ show (unLoc cast) ++ "]"
   show (XCalcExpr p) = show p
+
+
+
+calcExprType :: CalcExpr CalcTc -> Type
+calcExprType (CalcVar ty _) = ty 
+calcExprType (CalcLit ty _) = ty 
+calcExprType (CalcLam ty _ _) = ty 
+calcExprType (CalcApp ty _ _) = ty 
+calcExprType (CalcNegApp ty _) = ty 
+calcExprType (CalcOpApp ty _ _ _) = ty 
+calcExprType (CalcPar ty _) = ty 
+calcExprType (CalcImpMult ty _ _) = ty 
+calcExprType (CalcCast ty _ _) = ty 
