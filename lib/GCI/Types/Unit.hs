@@ -39,18 +39,21 @@ $(createDecs [
     ("min", [| [(Time, 1)] |],   Left 60),
     ("h",   [| [(Time, 1)] |],   Left 3600),
     ("d",   [| [(Time, 1)] |],   Left 86400),
+    ("day", [| [(Time, 1)] |],   Left 86400),
     ("m",   [| [(Length, 1)] |], Right   0),
     ("s",   [| [(Time, 1)] |],   Right   0),
     ("g",   [| [(Mass, 1)] |],   Right (-3)),
     ("t",   [| [(Mass, 1)] |],   Right   3),
     ("l",   [| [(Length, 3)] |], Right (-3))
   ] [
-    ("ha", [| [(Length, 2)] |],                        Left 10000),
-    ("a",  [| [(Length, 2)] |],                        Left 100),
-    ("Hz", [| [(Time, -1)] |],                         Right 0),
-    ("N",  [| [(Mass, 1), (Length, 1), (Time, -2)] |], Right 0),
-    ("J",  [| [(Mass, 1), (Length, 2), (Time, -2)] |], Right 0),
-    ("W",  [| [(Mass, 1), (Length, 2), (Time, -3)] |], Right 0)
+    ("ha",  [| [(Length, 2)] |],                         Left 10000),
+    ("a",   [| [(Length, 2)] |],                         Left 100),
+    ("Pa",  [| [(Mass, 1), (Length, -1), (Time, -2)] |], Left 1),
+    ("hPa", [| [(Mass, 1), (Length, -1), (Time, -2)] |], Left 100),
+    ("Hz",  [| [(Time, -1)] |],                          Right 0),
+    ("N",   [| [(Mass, 1), (Length, 1), (Time, -2)] |],  Right 0),
+    ("J",   [| [(Mass, 1), (Length, 2), (Time, -2)] |],  Right 0),
+    ("W",   [| [(Mass, 1), (Length, 2), (Time, -3)] |],  Right 0)
   ])
 
 
