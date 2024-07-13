@@ -5,11 +5,12 @@ module GCI.Types.SrcLoc where
 data SrcSpan = SrcSpan {
   srcSpanS :: !Int,
   srcSpanE :: !Int}
+  deriving (Eq)
 instance Show SrcSpan where
   show (SrcSpan start end) = "(" ++ show start ++ "-" ++ show end ++ ")"
 
 data Located e = L {getLoc :: SrcSpan, unLoc :: e}
-  deriving (Functor)
+  deriving (Functor, Eq)
 instance Show e => Show (Located e) where
   show (L loc e) = show loc ++ ": " ++ show e
 

@@ -20,7 +20,7 @@ typecheckDeclaration :: LCalcDecl CalcRn -> Tc (LCalcDecl CalcTc)
 typecheckDeclaration (L loc (ValD _ lname exp_rn)) = do
   exp_tc <- typecheckExpression exp_rn
   let uname = unLoc lname
-      ty = calcExprType $ unLoc exp_tc
+      ty = calcExprType exp_tc
   addType uname ty
   addVariable (unique_name uname) uname
-  return $ L loc $ ValD ty lname exp_tc
+  return $ L loc $ ValD (unLoc ty) lname exp_tc

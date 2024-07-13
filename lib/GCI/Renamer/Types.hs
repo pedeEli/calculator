@@ -10,13 +10,14 @@ import Language.Calc.Syntax.Expr
 import GCI.Calc.Extension
 
 import GCI.Types.Names
+import GCI.Types.SrcLoc
 
 import Data.Word
 import Data.Map as M
 import Data.Maybe
 
 
-type Rn = ExceptT String (State RnState)
+type Rn = ExceptT (Located String) (State RnState)
 type Tc = Rn
 data RnState = RnState {
   glbState :: GlbState,
@@ -25,7 +26,7 @@ data RnState = RnState {
 data GlbState = GlbState {
   unique_counter :: Word64,
   fixities :: Map Unique Fixity,
-  types :: Map Unique Type,
+  types :: Map Unique LType,
   unique_map :: Map String Unique}
 
 newtype LclState = LclState {
@@ -34,8 +35,9 @@ newtype LclState = LclState {
 newtype Fixity = Fixity Int
   deriving (Show, Eq, Ord)
 
+type LType = Located Type
 data Type =
-  Lambda Type Type
+  Lambda LType LType
   | Value
   | Variable Unique
   deriving (Eq)
@@ -58,12 +60,12 @@ defaultState = RnState {
       (Unique "/" 3, Fixity 1),
       (Unique "^" 4, Fixity 2)],
     types = M.fromList [
-      (Unique "+" 0, Lambda Value $ Lambda Value Value),
-      (Unique "-" 1, Lambda Value $ Lambda Value Value),
-      (Unique "*" 2, Lambda Value $ Lambda Value Value),
-      (Unique "/" 3, Lambda Value $ Lambda Value Value),
-      (Unique "^" 4, Lambda Value $ Lambda Value Value),
-      (Unique "negate" 5, Lambda Value Value)],
+      (Unique "+" 0, L mempty $ Lambda (L mempty Value) $ L mempty $ Lambda (L mempty Value) $ L mempty Value),
+      (Unique "-" 1, L mempty $ Lambda (L mempty Value) $ L mempty $ Lambda (L mempty Value) $ L mempty Value),
+      (Unique "*" 2, L mempty $ Lambda (L mempty Value) $ L mempty $ Lambda (L mempty Value) $ L mempty Value),
+      (Unique "/" 3, L mempty $ Lambda (L mempty Value) $ L mempty $ Lambda (L mempty Value) $ L mempty Value),
+      (Unique "^" 4, L mempty $ Lambda (L mempty Value) $ L mempty $ Lambda (L mempty Value) $ L mempty Value),
+      (Unique "negate" 5, L mempty $ Lambda (L mempty Value) $ L mempty Value)],
     unique_map = M.fromList [
       ("+", Unique "+" 0),
       ("-", Unique "-" 1),
@@ -117,25 +119,26 @@ getFixity name = do
   return $ findWithDefault (Fixity 9) name fs
 
 
-applyVariable :: Unique -> Type -> Type -> Type
-applyVariable uname ty (Lambda l r) =
+applyVariable :: Unique -> LType -> LType -> LType
+applyVariable uname ty (L loc (Lambda l r)) = L loc $
   Lambda (applyVariable uname ty l) (applyVariable uname ty r)
-applyVariable _ _ Value = Value
-applyVariable name ty (Variable a)
+applyVariable _ _ v@(L _ Value) = v
+applyVariable name ty v@(L _ (Variable a))
   | name == a = ty
-  | otherwise = Variable a
+  | otherwise = v
 
 
-getType :: Unique -> Rn Type
-getType uname = do
+getType :: Located Unique -> Rn LType
+getType lname = do
   s <- lift get
   let glbs = glbState s
       tys = types glbs
+      uname = unLoc lname
   case M.lookup uname tys of
-    Nothing -> reportError $ "unbound variable " ++ unique_name uname
+    Nothing -> reportError (getLoc lname) $ "unbound variable " ++ unique_name uname
     Just ty -> return ty
 
-addType :: Unique -> Type -> Rn ()
+addType :: Unique -> LType -> Rn ()
 addType uname ty = do
   s <- lift get
   let glbs = glbState s
@@ -152,5 +155,5 @@ addVariable name uname = do
     unique_map = M.insert name uname um}}
 
 
-reportError :: String -> Rn a
-reportError = throwE
+reportError :: SrcSpan -> String -> Rn a
+reportError span = throwE . L span

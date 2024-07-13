@@ -14,7 +14,10 @@ loop = do
   str <- liftIO getLine
   result <- interpret str
   case result of
-    Nothing -> loop
-    Just s -> do
-      liftIO $ putStrLn s
+    Success -> loop
+    ValI val -> do
+      liftIO $ putStrLn val
+      loop
+    ErrorI lerr -> do
+      liftIO $ print lerr
       loop

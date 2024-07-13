@@ -34,95 +34,95 @@ typecheckExpression (L loc exp) = L loc <$> case exp of
 
 typecheckVar :: LIdP CalcRn -> Tc (CalcExpr CalcTc)
 typecheckVar lname = do
-  let name = unLoc lname
-  ty <- getType name
-  return $ CalcVar ty lname
+  ty <- getType lname
+  return $ CalcVar (unLoc ty) lname
 
 typecheckLam :: LIdP CalcRn -> LCalcExpr CalcRn -> Tc (CalcExpr CalcTc)
 typecheckLam lname exp_rn = do
   let name = unLoc lname
-  addType name (Variable name)
+  addType name $ L (getLoc lname) $ Variable name
   exp_tc <- typecheckExpression exp_rn
-  name_type <- getType name
-  let ty = Lambda name_type $ calcExprType $ unLoc exp_tc
+  name_type <- getType lname
+  let ty = Lambda name_type $ calcExprType exp_tc
   return $ CalcLam ty lname exp_tc
 
 typecheckApp :: LCalcExpr CalcRn -> LCalcExpr CalcRn -> Tc (CalcExpr CalcTc)
 typecheckApp left_rn right_rn = do
   left_tc <- typecheckExpression left_rn
   right_tc <- typecheckExpression right_rn
-  let left_ty  = calcExprType $ unLoc left_tc
-      right_ty = calcExprType $ unLoc right_tc
+  let left_ty  = calcExprType left_tc
+      right_ty = calcExprType right_tc
   ty <- applyType left_ty right_ty
-  return $ CalcApp ty left_tc right_tc
+  return $ CalcApp (unLoc ty) left_tc right_tc
 
 typecheckNegApp :: LCalcExpr CalcRn -> Tc (CalcExpr CalcTc)
 typecheckNegApp exp_rn = do
   exp_tc <- typecheckExpression exp_rn
-  let ty = calcExprType $ unLoc exp_tc
-  return $ CalcNegApp ty exp_tc
+  let ty = calcExprType exp_tc
+  return $ CalcNegApp (unLoc ty) exp_tc
 
 typecheckOpApp :: LCalcExpr CalcRn -> Located Unique -> LCalcExpr CalcRn -> Tc (CalcExpr CalcTc)
 typecheckOpApp left_rn op right_rn = do
   left_tc <- typecheckExpression left_rn
   right_tc <- typecheckExpression right_rn
-  let left_ty  = calcExprType $ unLoc left_tc
-      right_ty = calcExprType $ unLoc right_tc
-  op_ty <- getType $ unLoc op
+  let left_ty  = calcExprType left_tc
+      right_ty = calcExprType right_tc
+  op_ty <- getType op
   ty1 <- applyType op_ty left_ty
   ty2 <- applyType ty1 right_ty
-  return $ CalcOpApp ty2 right_tc op left_tc
+  return $ CalcOpApp (unLoc ty2) right_tc op left_tc
 
 typecheckPar :: LCalcExpr CalcRn -> Tc (CalcExpr CalcTc)
 typecheckPar exp_rn = do
   exp_tc <- typecheckExpression exp_rn
-  let ty = calcExprType $ unLoc exp_tc
-  return $ CalcPar ty exp_tc
+  let ty = calcExprType exp_tc
+  return $ CalcPar (unLoc ty) exp_tc
 
 typecheckImpMult :: LCalcExpr CalcRn -> LCalcExpr CalcRn -> Tc (CalcExpr CalcTc)
 typecheckImpMult left_rn right_rn = do
   left_tc <- typecheckExpression left_rn
   right_tc <- typecheckExpression right_rn
-  let left_ty  = calcExprType $ unLoc left_tc
-      right_ty = calcExprType $ unLoc right_tc
-  if left_ty == Value && right_ty == Value
-    then return $ CalcImpMult Value left_tc right_tc
-    else reportError "missmatching units in implicit multiplication"
+  let left_ty  = calcExprType left_tc
+      right_ty = calcExprType right_tc
+  case (unLoc left_ty, unLoc right_ty) of
+    (Value, Value) -> return $ CalcImpMult Value left_tc right_tc
+    (Value, _) -> reportError (getLoc right_tc) "implicit multiplication only possible with value types"
+    _ -> reportError (getLoc left_tc) "implicit multiplication only possible with value types"
 
 typecheckCast :: LCalcExpr CalcRn -> LCalcExpr CalcRn -> Tc (CalcExpr CalcTc)
 typecheckCast exp_rn cast_rn = do
   exp_tc  <- typecheckExpression exp_rn
   cast_tc <- typecheckExpression cast_rn
-  let exp_ty  = calcExprType $ unLoc exp_tc
-      cast_ty = calcExprType $ unLoc cast_tc
-  if exp_ty == Value && cast_ty == Value
-    then return $ CalcCast Value exp_tc cast_tc
-    else reportError "mismatching units in cast"
+  let exp_ty  = calcExprType exp_tc
+      cast_ty = calcExprType cast_tc
+  case (unLoc exp_ty, unLoc cast_ty) of
+    (Value, Value) -> return $ CalcCast Value exp_tc cast_tc
+    (Value, _) -> reportError (getLoc cast_tc) "cast cannot be a function"
+    _ -> reportError (getLoc exp_tc) "cast cannot be applied to function"
 
 
-
-applyType :: Type -> Type -> Tc Type
-applyType Value _ = reportError "cannot apply argument to value"
-applyType (Variable a) r = do
+applyType :: LType -> LType -> Tc LType
+applyType (L loc Value) _ = reportError loc "cannot apply argument to value"
+applyType (L loc (Variable a)) r = do
   return_type_name <- mkUniqueName $ unique_name a
-  let return_type = Variable return_type_name
-      ty = Lambda r return_type
+  let return_type = L loc $ Variable return_type_name
+      ty = L (loc <> getLoc r) $ Lambda r return_type
   addType return_type_name return_type
   addType a ty
   return return_type
-applyType (Lambda arg right) app = do
+applyType (L loc (Lambda arg right)) app = do
   eqs <- typesEqual arg app
   traverse_ (uncurry addType) eqs
   return $ foldr (uncurry applyVariable) right eqs
 
 
-typesEqual :: Type -> Type -> Tc [(Unique, Type)]
-typesEqual Value Value = return []
-typesEqual Value (Variable uname) = return [(uname, Value)]
-typesEqual Value _ = reportError "missmatching types"
-typesEqual (Variable uname) ty = return [(uname, ty)]
-typesEqual (Lambda ty1_1 ty1_2) (Lambda ty2_1 ty2_2) = do
+typesEqual :: LType -> LType -> Tc [(Unique, LType)]
+typesEqual (L _ Value) (L _ Value) = return []
+typesEqual v@(L _ Value) (L _ (Variable uname)) = return [(uname, v)]
+typesEqual (L loc Value) ty = reportError (loc <> getLoc ty) "missmatching types"
+typesEqual (L _ (Variable uname)) ty = return [(uname, ty)]
+typesEqual (L _ (Lambda ty1_1 ty1_2)) (L _ (Lambda ty2_1 ty2_2)) = do
   eqs1 <- typesEqual ty1_1 ty2_1
   eqs2 <- typesEqual ty1_2 ty2_2
   return $ eqs1 ++ eqs2
-typesEqual (Lambda _ _) _ = reportError "missmatching types" 
+typesEqual (L loc (Lambda _ _)) ty = reportError (loc <> getLoc ty) "missmatching types" 

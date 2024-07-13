@@ -35,7 +35,7 @@ import GCI.Core.Expr
 
 
 type Calculator = StateT CState IO
-type ECalculator = ExceptT String Calculator
+type ECalculator = ExceptT (Located String) Calculator
 data CState = CState {
   rn_state :: RnState,
   variables :: Map Unique Expr,
@@ -47,9 +47,8 @@ getVariable :: Unique -> ECalculator Expr
 getVariable uname = do
   s <- lift get
   let vars = variables s
-  case M.lookup uname vars of
-    Nothing -> throwE $ "unbound variable " ++ unique_name uname
-    Just exp -> return exp
+      Just exp = M.lookup uname vars
+  return exp
 
 setVariable :: Unique -> Expr -> Calculator ()
 setVariable uname exp = modify $ \s -> s {
@@ -74,10 +73,8 @@ startCalculator calc = evalStateT calc $ CState {
     (Unique "^" 4, convertOperator 54 (<<^>>)),
     (Unique "negate" 5, do
       a_expr <- getVariable $ Unique "a" 55
-      a_result <- evaluate a_expr
-      case a_result of
-        ValR a_value -> V.negate a_value
-        _ -> throwE "cannot apply lambda to build in function")]}
+      ValR a_value <- evaluate a_expr
+      V.negate a_value)]}
 
 
 convertOperator :: Word64 -> (Value -> Value -> ECalculator Value) -> ECalculator Value
@@ -87,12 +84,15 @@ convertOperator i op = do
   a_result <- evaluate a_expr
   b_result <- evaluate b_expr
   case (a_result, b_result) of
-    (ValR a_value, ValR b_value) -> op a_value b_value
-    _ -> throwE "cannot apply lambda to build in operator"
+    (ValR a_value, ValR b_value) -> op b_value a_value
+    _ -> throwE $ L mempty "cannot apply lambda to build in operator"
 
+data Interpret =
+  ValI String |
+  ErrorI (Located String) |
+  Success
 
-
-interpret :: String -> Calculator (Maybe String)
+interpret :: String -> Calculator Interpret
 interpret str = do
   let decl_ps = runParser parseDeclaration () "<interactive>" str
   case decl_ps of
@@ -100,10 +100,10 @@ interpret str = do
     Left _ -> do
       let expr_ps = runParser parseExpression () "<interactive>" str
       case expr_ps of
-        Left err -> return $ Just $ show err
+        Left err -> return $ ErrorI $ L mempty $ show err
         Right expr_ps -> interpretExpr expr_ps
 
-interpretExpr :: LCalcExpr CalcPs -> Calculator (Maybe String)
+interpretExpr :: LCalcExpr CalcPs -> Calculator Interpret
 interpretExpr expr_ps = do
   result <- runExceptT $ do
     expr_rn <- runRn $ renameExpression expr_ps
@@ -113,16 +113,16 @@ interpretExpr expr_ps = do
     return $ case result of
       LamR _ _ -> "cannot display lambda"
       ValR v -> show v
-  return $ either Just Just result
+  return $ either ErrorI ValI result
 
-interpretDecl :: LCalcDecl CalcPs -> Calculator (Maybe String)
+interpretDecl :: LCalcDecl CalcPs -> Calculator Interpret
 interpretDecl decl_ps = do
   result <- runExceptT $ do
     decl_rn <- runRn $ renameDeclaration decl_ps
     decl_tc <- runTc $ typecheckDeclaration decl_rn
     let L _ (ValD ty (L _ uname) exp) = decl_tc
     lift $ setVariable uname $ simplify exp
-  return $ either Just (const Nothing) result
+  return $ either ErrorI (const Success) result
 
 
 data Result =
@@ -139,27 +139,23 @@ evaluate (Lit value) = do
     else value
 evaluate (Lam uname exp) = return $ LamR uname exp
 evaluate (App left right) = do
-  left_r <- evaluate left
-  case left_r of
-    ValR _ -> throwE "cannot apply argument to value"
-    LamR uname expr -> do
-      lift $ setVariable uname right
-      evaluate expr
+  LamR uname exp <- evaluate left
+  lift $ setVariable uname right
+  evaluate exp
 evaluate (Cast exp cast) = do
   exp_result <- evaluate exp
   cast_result <- evaluate cast
   case (exp_result, cast_result) of
     (ValR exp_value, ValR cast_value) -> do
       when (unitsEqual exp_value cast_value) $
-        throwE "missmatched units in cast"
+        throwE $ L mempty "missmatched units in cast"
       return $ ValR $ castValue exp_value cast_value
-    _ -> throwE "cannot cast a lambda expression"
+    _ -> throwE $ L mempty "cannot cast a lambda expression"
 evaluate (BuildIn uname) = do
   s <- lift get
   let bi = build_ins s
-  case M.lookup uname bi of
-    Nothing -> throwE $ "unknown build in " ++ unique_name uname
-    Just b -> ValR <$> b
+      Just b = M.lookup uname bi
+  ValR <$> b
 
 
 runRn :: Rn a -> ECalculator a

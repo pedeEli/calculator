@@ -7,6 +7,7 @@ import Control.Monad.Trans.Except
 import Data.Ratio
 
 import GCI.Types.Unit
+import GCI.Types.SrcLoc
 
 
 data Value = Value {
@@ -40,39 +41,39 @@ instance Show Value where
       showUnit unit _    = show unit
 
 
-(<<+>>) :: Monad m => Value -> Value -> ExceptT String m Value
+(<<+>>) :: Monad m => Value -> Value -> ExceptT (Located String) m Value
 Value b1 u1 _ <<+>> Value b2 u2 _
-  | u1 /= u2  = throwE "missmatching units"
+  | u1 /= u2  = throwE $ L mempty "missmatching units"
   | otherwise = return $ Value (b1 + b2) u1 []
 
-(<<->>) :: Monad m => Value -> Value -> ExceptT String m Value
+(<<->>) :: Monad m => Value -> Value -> ExceptT (Located String) m Value
 Value b1 u1 _ <<->> Value b2 u2 _
-  | u1 /= u2  = throwE "missmatching units"
+  | u1 /= u2  = throwE $ L mempty "missmatching units"
   | otherwise = return $ Value (b1 - b2) u1 []
 
-(<<*>>) :: Monad m => Value -> Value -> ExceptT String m Value
+(<<*>>) :: Monad m => Value -> Value -> ExceptT (Located String) m Value
 Value b1 u1 o1 <<*>> Value b2 u2 o2 = return $
   Value (b1 * b2) (multiply u1 u2) (multiply o1 o2)
 
-negate :: Monad m => Value -> ExceptT String m Value
+negate :: Monad m => Value -> ExceptT (Located String) m Value
 negate (Value b u o) = return $ Value (-b) u o
 
-(<</>>) :: Monad m => Value -> Value -> ExceptT String m Value
+(<</>>) :: Monad m => Value -> Value -> ExceptT (Located String) m Value
 Value b1 u1 o1 <</>> Value b2 u2 o2 = return $ Value (b1 / b2) (divide u1 u2) (divide o1 o2)
 
-vRecip :: Monad m => Value -> ExceptT String m Value
+vRecip :: Monad m => Value -> ExceptT (Located String) m Value
 vRecip (Value b u o) = return $
   Value (recip b) (divide [] u) (divide [] o)
 
 
-(<<^>>) :: Monad m => Value -> Value -> ExceptT String m Value
+(<<^>>) :: Monad m => Value -> Value -> ExceptT (Located String) m Value
 Value b1 u1 o1 <<^>> Value b2 u2 _
-  | u2 /= []           = throwE "exponent cannot have any units"
-  | b1 == 0 && b2 == 0 = throwE "0^0 is undefined"
+  | u2 /= []           = throwE $ L mempty "exponent cannot have any units"
+  | b1 == 0 && b2 == 0 = throwE $ L mempty "0^0 is undefined"
   | b2 == 0            = return $ Value 1 [] []
   | b2 == 1            = return $ Value b1 u1 o1
   | d2 == 1            = return $ Value (b1 ^ n2) (f u1) (f o1)
-  | u1 /= []           = throwE "cannot take roots of units"
+  | u1 /= []           = throwE $ L mempty "cannot take roots of units"
   | otherwise          = return $ Value (newtonsMethod (b1 ^ n2) d2) [] []
   where
     n2 = numerator   b2

@@ -31,11 +31,11 @@ renameExpression (L loc exp) = L loc <$> case exp of
 
 
 renameVar :: LIdP CalcPs -> Rn (CalcExpr CalcRn)
-renameVar name = do
-  uname <- getName $ unLoc name
+renameVar (L loc name) = do
+  uname <- getName name
   case uname of
-    Nothing -> reportError $ "unknown variable " ++ unLoc name
-    Just uname -> return $ CalcVar noExtField $ L (getLoc name) uname
+    Nothing -> reportError loc "unknown variable"
+    Just uname -> return $ CalcVar noExtField $ L loc uname
 
 renameLam :: LIdP CalcPs -> LCalcExpr CalcPs -> Rn (CalcExpr CalcRn)
 renameLam name exp_ps = do
@@ -53,15 +53,15 @@ renameApp left_ps right_ps = do
   return $ mkApp left_rn right_rn
 
 renameOpApp :: LCalcExpr CalcPs -> LIdP CalcPs -> LCalcExpr CalcPs -> Rn (CalcExpr CalcRn)
-renameOpApp left_ps op_ps right_ps = do
+renameOpApp left_ps (L op_loc op_ps) right_ps = do
   left_rn <- renameExpression left_ps
-  op_rn <- getName $ unLoc op_ps
+  op_rn <- getName op_ps
   case op_rn of
-    Nothing -> reportError $ "unknown variable " ++ unLoc op_ps
+    Nothing -> reportError op_loc "unknown variable"
     Just op_rn -> do
       right_rn <- renameExpression right_ps
       fix <- getFixity op_rn
-      return $ mkOpApp fix left_rn (L (getLoc op_ps) op_rn) right_rn
+      return $ mkOpApp fix left_rn (L op_loc op_rn) right_rn
 
 renameImpMult :: LCalcExpr CalcPs -> LCalcExpr CalcPs -> Rn (CalcExpr CalcRn)
 renameImpMult left_ps right_ps = do

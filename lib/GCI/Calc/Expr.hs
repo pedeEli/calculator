@@ -72,13 +72,13 @@ instance {-# OVERLAPS #-} (
 
 
 
-calcExprType :: CalcExpr CalcTc -> Type
-calcExprType (CalcVar ty _) = ty 
-calcExprType (CalcLit ty _) = ty 
-calcExprType (CalcLam ty _ _) = ty 
-calcExprType (CalcApp ty _ _) = ty 
-calcExprType (CalcNegApp ty _) = ty 
-calcExprType (CalcOpApp ty _ _ _) = ty 
-calcExprType (CalcPar ty _) = ty 
-calcExprType (CalcImpMult ty _ _) = ty 
-calcExprType (CalcCast ty _ _) = ty 
+calcExprType :: LCalcExpr CalcTc -> LType
+calcExprType (L loc (CalcVar ty _)) = L loc ty 
+calcExprType (L loc (CalcLit ty _)) = L loc ty 
+calcExprType (L loc (CalcLam ty _ _)) = L loc ty 
+calcExprType (L loc (CalcApp ty _ _)) = L loc ty 
+calcExprType (L loc (CalcNegApp ty _)) = L loc ty 
+calcExprType (L loc (CalcOpApp ty _ _ _)) = L loc ty 
+calcExprType (L loc (CalcPar ty _)) = L loc ty 
+calcExprType (L loc (CalcImpMult ty _ _)) = L loc ty 
+calcExprType (L loc (CalcCast ty _ _)) = L loc ty 
