@@ -21,10 +21,6 @@ extra-source-files: CHANGELOG.md
 
 library
     exposed-modules:
-        Calc.Token,
-        Calc.Error,
-        Calc.Calculator,
-
         Language.Calc.Syntax.Expr,
         Language.Calc.Syntax.Lit,
         Language.Calc.Syntax.Decl,

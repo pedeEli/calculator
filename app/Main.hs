@@ -1,12 +1,26 @@
 module Main where
 
-import GCI.Calculator
 import Control.Monad.IO.Class
+
+import GCI.Calculator
+
+import GCI.Types.Value as V
+
 
 main :: IO ()
 main = do
   putStrLn "Rechner"
-  startCalculator loop
+  startCalculator $ do
+    
+    addBuildIn2 "+" 0 (<<+>>)
+    addBuildIn2 "-" 0 (<<->>)
+    addBuildIn2 "*" 1 (<<*>>)
+    addBuildIn2 "/" 1 (<</>>)
+    addBuildIn2 "^" 2 (<<^>>)
+
+    addBuildIn1 "negate" V.negate
+    
+    loop
 
 
 loop :: Calculator ()

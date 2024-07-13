@@ -37,7 +37,7 @@ type instance XOpApp CalcTc = Type
 
 type instance XNegApp CalcPs = NoExtField
 type instance XNegApp CalcRn = NoExtField
-type instance XNegApp CalcTc = Type
+type instance XNegApp CalcTc = DataConCantHappen
 
 type instance XPar CalcPs = NoExtField
 type instance XPar CalcRn = NoExtField
@@ -45,7 +45,7 @@ type instance XPar CalcTc = Type
 
 type instance XImpMult CalcPs = NoExtField
 type instance XImpMult CalcRn = NoExtField
-type instance XImpMult CalcTc = Type
+type instance XImpMult CalcTc = DataConCantHappen
 
 type instance XCast CalcPs = NoExtField
 type instance XCast CalcRn = NoExtField
@@ -73,12 +73,10 @@ instance {-# OVERLAPS #-} (
 
 
 calcExprType :: LCalcExpr CalcTc -> LType
-calcExprType (L loc (CalcVar ty _)) = L loc ty 
-calcExprType (L loc (CalcLit ty _)) = L loc ty 
-calcExprType (L loc (CalcLam ty _ _)) = L loc ty 
-calcExprType (L loc (CalcApp ty _ _)) = L loc ty 
-calcExprType (L loc (CalcNegApp ty _)) = L loc ty 
-calcExprType (L loc (CalcOpApp ty _ _ _)) = L loc ty 
-calcExprType (L loc (CalcPar ty _)) = L loc ty 
-calcExprType (L loc (CalcImpMult ty _ _)) = L loc ty 
-calcExprType (L loc (CalcCast ty _ _)) = L loc ty 
+calcExprType (L loc (CalcVar ty _)) = L loc ty
+calcExprType (L loc (CalcLit ty _)) = L loc ty
+calcExprType (L loc (CalcLam ty _ _)) = L loc ty
+calcExprType (L loc (CalcApp ty _ _)) = L loc ty
+calcExprType (L loc (CalcOpApp ty _ _ _)) = L loc ty
+calcExprType (L loc (CalcPar ty _)) = L loc ty
+calcExprType (L loc (CalcCast ty _ _)) = L loc ty

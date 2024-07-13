@@ -59,7 +59,12 @@ typecheckNegApp :: LCalcExpr CalcRn -> Tc (CalcExpr CalcTc)
 typecheckNegApp exp_rn = do
   exp_tc <- typecheckExpression exp_rn
   let ty = calcExprType exp_tc
-  return $ CalcNegApp (unLoc ty) exp_tc
+      loc = getLoc exp_tc
+  uname <- getName "negate"
+  case uname of
+    Nothing -> reportError loc "negate is not defined"
+    Just uname -> return $
+      CalcApp (unLoc ty) (L loc $ CalcVar (Variable uname) (L loc uname)) exp_tc
 
 typecheckOpApp :: LCalcExpr CalcRn -> Located Unique -> LCalcExpr CalcRn -> Tc (CalcExpr CalcTc)
 typecheckOpApp left_rn op right_rn = do
@@ -84,10 +89,15 @@ typecheckImpMult left_rn right_rn = do
   right_tc <- typecheckExpression right_rn
   let left_ty  = calcExprType left_tc
       right_ty = calcExprType right_tc
-  case (unLoc left_ty, unLoc right_ty) of
-    (Value, Value) -> return $ CalcImpMult Value left_tc right_tc
-    (Value, _) -> reportError (getLoc right_tc) "implicit multiplication only possible with value types"
-    _ -> reportError (getLoc left_tc) "implicit multiplication only possible with value types"
+      left_loc  = getLoc left_tc
+      right_loc = getLoc right_tc
+  uname <- getName "*"
+  case (unLoc left_ty, unLoc right_ty, uname) of
+    (_, _, Nothing) -> reportError (left_loc <> right_loc) "* is not defined"
+    (Value, Value, Just uname) -> return $
+      CalcOpApp Value left_tc (L (left_loc <> right_loc) uname) right_tc
+    (Value, _, _) -> reportError right_loc "implicit multiplication only possible with value types"
+    _ -> reportError left_loc "implicit multiplication only possible with value types"
 
 typecheckCast :: LCalcExpr CalcRn -> LCalcExpr CalcRn -> Tc (CalcExpr CalcTc)
 typecheckCast exp_rn cast_rn = do

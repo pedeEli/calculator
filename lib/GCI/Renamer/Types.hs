@@ -52,27 +52,10 @@ defaultState = RnState {
   lclState = LclState {
     names = mempty},
   glbState = GlbState {
-    unique_counter = 100,
-    fixities = M.fromList [
-      (Unique "+" 0, Fixity 0),
-      (Unique "-" 1, Fixity 0),
-      (Unique "*" 2, Fixity 1),
-      (Unique "/" 3, Fixity 1),
-      (Unique "^" 4, Fixity 2)],
-    types = M.fromList [
-      (Unique "+" 0, L mempty $ Lambda (L mempty Value) $ L mempty $ Lambda (L mempty Value) $ L mempty Value),
-      (Unique "-" 1, L mempty $ Lambda (L mempty Value) $ L mempty $ Lambda (L mempty Value) $ L mempty Value),
-      (Unique "*" 2, L mempty $ Lambda (L mempty Value) $ L mempty $ Lambda (L mempty Value) $ L mempty Value),
-      (Unique "/" 3, L mempty $ Lambda (L mempty Value) $ L mempty $ Lambda (L mempty Value) $ L mempty Value),
-      (Unique "^" 4, L mempty $ Lambda (L mempty Value) $ L mempty $ Lambda (L mempty Value) $ L mempty Value),
-      (Unique "negate" 5, L mempty $ Lambda (L mempty Value) $ L mempty Value)],
-    unique_map = M.fromList [
-      ("+", Unique "+" 0),
-      ("-", Unique "-" 1),
-      ("*", Unique "*" 2),
-      ("/", Unique "/" 3),
-      ("^", Unique "^" 4),
-      ("negate", Unique "negate" 5)]}}
+    unique_counter = 0,
+    fixities = mempty,
+    types = mempty,
+    unique_map = mempty}}
 
 
 mkUniqueName :: String -> Rn Unique
@@ -117,6 +100,14 @@ getFixity name = do
   let glbs = glbState s
       fs = fixities glbs
   return $ findWithDefault (Fixity 9) name fs
+
+setFixity :: Unique -> Fixity -> Rn ()
+setFixity name fix = do
+  s <- lift get
+  let glbs = glbState s
+      fs = fixities glbs
+  lift $ put s {glbState = glbs {
+    fixities = M.insert name fix fs}}
 
 
 applyVariable :: Unique -> LType -> LType -> LType

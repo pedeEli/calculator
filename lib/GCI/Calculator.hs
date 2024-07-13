@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables, TypeApplications, FlexibleContexts, GADTs #-}
 module GCI.Calculator where
 
 
@@ -20,7 +21,7 @@ import GCI.Calc.Extension
 import GCI.Parser.Expr
 import GCI.Parser.Decl
 
-import GCI.Renamer.Types
+import GCI.Renamer.Types as Rn
 import GCI.Renamer.Expr
 import GCI.Renamer.Decl
 
@@ -32,6 +33,7 @@ import GCI.Types.SrcLoc
 import GCI.Types.Value as V
 
 import GCI.Core.Expr
+import Debug.Trace (traceM)
 
 
 type Calculator = StateT CState IO
@@ -58,24 +60,44 @@ startCalculator :: Calculator () -> IO ()
 startCalculator calc = evalStateT calc $ CState {
   strip_override = True,
   rn_state = defaultState,
-  variables = M.fromList [
-    (Unique "+" 0, Lam (Unique "a" 50) $ Lam (Unique "b" 50) $ BuildIn $ Unique "+" 0),
-    (Unique "-" 1, Lam (Unique "a" 51) $ Lam (Unique "b" 51) $ BuildIn $ Unique "-" 1),
-    (Unique "*" 2, Lam (Unique "a" 52) $ Lam (Unique "b" 52) $ BuildIn $ Unique "*" 2),
-    (Unique "/" 3, Lam (Unique "a" 53) $ Lam (Unique "b" 53) $ BuildIn $ Unique "/" 3),
-    (Unique "^" 4, Lam (Unique "a" 54) $ Lam (Unique "b" 54) $ BuildIn $ Unique "^" 4),
-    (Unique "negate" 5, Lam (Unique "a" 55) $ BuildIn $ Unique "negate" 5)],
-  build_ins = M.fromList [
-    (Unique "+" 0, convertOperator 50 (<<+>>)),
-    (Unique "-" 1, convertOperator 51 (<<->>)),
-    (Unique "*" 2, convertOperator 52 (<<*>>)),
-    (Unique "/" 3, convertOperator 53 (<</>>)),
-    (Unique "^" 4, convertOperator 54 (<<^>>)),
-    (Unique "negate" 5, do
-      a_expr <- getVariable $ Unique "a" 55
-      ValR a_value <- evaluate a_expr
-      V.negate a_value)]}
+  variables = mempty,
+  build_ins = mempty}
 
+
+addBuildIn1 :: String -> (Value -> ExceptT (Located String) Calculator Value) -> Calculator ()
+addBuildIn1 name f = do
+  Right uname <- runExceptT $ runRn $ mkUniqueName name
+  Right arg1 <- runExceptT $ runRn $ mkUniqueName "a"
+  let g = do
+        a_exp <- getVariable arg1
+        ValR a_val <- evaluate a_exp
+        f a_val
+      exp = Lam arg1 $ BuildIn uname
+      ty = L mempty $ Lambda (L mempty Rn.Value) $ L mempty Rn.Value
+  runExceptT $ runRn $ do
+    addType uname ty
+    addVariable name uname
+  modify $ \s -> s {build_ins = M.insert uname g $ build_ins s}
+
+addBuildIn2 :: String -> Int -> (Value -> Value -> ExceptT (Located String) Calculator Value) -> Calculator ()
+addBuildIn2 name fix f = do
+  Right uname <- runExceptT $ runRn $ mkUniqueName name
+  Right arg1 <- runExceptT $ runRn $ mkUniqueName "a"
+  Right arg2 <- runExceptT $ runRn $ mkUniqueName "b"
+  let g = do
+        a_exp <- getVariable arg1
+        b_exp <- getVariable arg2
+        ValR a_val <- evaluate a_exp
+        ValR b_val <- evaluate b_exp
+        f a_val b_val
+      exp = Lam arg1 $ Lam arg2 $ BuildIn uname
+      ty = L mempty $ Lambda (L mempty Rn.Value) $ L mempty $ Lambda (L mempty Rn.Value) $ L mempty Rn.Value
+  runExceptT $ runRn $ do
+    addType uname ty
+    addVariable name uname
+    setFixity uname $ Fixity fix
+  setVariable uname exp
+  modify $ \s -> s {build_ins = M.insert uname g $ build_ins s}
 
 convertOperator :: Word64 -> (Value -> Value -> ECalculator Value) -> ECalculator Value
 convertOperator i op = do

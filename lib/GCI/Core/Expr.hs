@@ -32,10 +32,8 @@ simplify' (CalcVar _ lname) = Var $ unLoc lname
 simplify' (CalcLit _ lit) = simplifyLit lit
 simplify' (CalcLam _ left right) = Lam (unLoc left) (simplify right)
 simplify' (CalcApp _ left right) = App (simplify left) (simplify right)
-simplify' (CalcNegApp _ exp) = App (Var $ Unique "negate" 5) $ simplify exp
 simplify' (CalcOpApp _ left op right) = App (App (Var $ unLoc op) $ simplify left) $ simplify right
 simplify' (CalcPar _ exp) = simplify exp
-simplify' (CalcImpMult _ left right) = App (App (Var $ Unique "*" 2) $ simplify left) $ simplify right 
 simplify' (CalcCast _ exp cast) = simplify exp
 
 
