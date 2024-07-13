@@ -85,11 +85,6 @@ showRational :: Rational -> String
 showRational r = if denominator r == 1
   then show $ numerator r
   else show (Prelude.fromRational r :: Double)
-  -- let n = numerator r
-  --     d = denominator r
-  -- in if d == 1
-  --   then show n
-  --   else show n ++ "/" ++ show d
 
 
 

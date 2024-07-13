@@ -27,7 +27,7 @@ data RnState = RnState {
 data GlbState = GlbState {
   unique_counter :: Word64,
   fixities :: Map Unique Fixity,
-  types :: Map Unique LType,
+  types :: Map Unique Type,
   unique_map :: Map String Unique}
   deriving (Show)
 
@@ -38,9 +38,8 @@ newtype LclState = LclState {
 newtype Fixity = Fixity Int
   deriving (Show, Eq, Ord)
 
-type LType = Located Type
 data Type =
-  Lambda LType LType
+  Lambda Type Type
   | Value
   | Variable Unique
   deriving (Eq)
@@ -113,16 +112,15 @@ setFixity name fix = do
     fixities = M.insert name fix fs}}
 
 
-applyVariable :: Unique -> LType -> LType -> LType
-applyVariable uname ty (L loc (Lambda l r)) = L loc $
-  Lambda (applyVariable uname ty l) (applyVariable uname ty r)
-applyVariable _ _ v@(L _ Value) = v
-applyVariable name ty v@(L _ (Variable a))
+applyVariable :: Unique -> Type -> Type -> Type
+applyVariable uname ty (Lambda l r) = Lambda (applyVariable uname ty l) (applyVariable uname ty r)
+applyVariable _ _ Value = Value
+applyVariable name ty (Variable a)
   | name == a = ty
-  | otherwise = v
+  | otherwise = Variable a
 
 
-getType :: Located Unique -> Rn LType
+getType :: Located Unique -> Rn Type
 getType lname = do
   s <- lift get
   let glbs = glbState s
@@ -132,7 +130,7 @@ getType lname = do
     Nothing -> reportError (getLoc lname) $ "unbound variable " ++ unique_name uname
     Just ty -> return ty
 
-addType :: Unique -> LType -> Rn ()
+addType :: Unique -> Type -> Rn ()
 addType uname ty = do
   s <- lift get
   let glbs = glbState s

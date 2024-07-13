@@ -23,4 +23,4 @@ typecheckDeclaration (L loc (ValD _ lname exp_rn)) = do
       ty = calcExprType exp_tc
   addType uname ty
   addVariable (unique_name uname) uname
-  return $ L loc $ ValD (unLoc ty) lname exp_tc
+  return $ L loc $ ValD ty lname exp_tc

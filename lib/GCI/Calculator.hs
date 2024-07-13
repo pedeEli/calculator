@@ -8,6 +8,7 @@ import Control.Monad.Trans.Class
 import Control.Monad
 
 import Text.Parsec
+import Text.Parsec.Error
 
 import Data.Map as M
 import Data.Word
@@ -33,7 +34,6 @@ import GCI.Types.SrcLoc
 import GCI.Types.Value as V
 
 import GCI.Core.Expr
-import Debug.Trace (traceM)
 
 
 type Calculator = StateT CState IO
@@ -77,7 +77,7 @@ addBuildIn1 name f = do
         ValR a_val <- evaluate a_exp
         f a_val
       exp = Lam arg1 $ BuildIn uname
-      ty = L mempty $ Lambda (L mempty Rn.Value) $ L mempty Rn.Value
+      ty = Lambda Rn.Value Rn.Value
   runExceptT $ runRn $ do
     addType uname ty
     addVariable name uname
@@ -96,7 +96,7 @@ addBuildIn2 name fix f = do
         ValR b_val <- evaluate b_exp
         f b_val a_val
       exp = Lam arg1 $ Lam arg2 $ BuildIn uname
-      ty = L mempty $ Lambda (L mempty Rn.Value) $ L mempty $ Lambda (L mempty Rn.Value) $ L mempty Rn.Value
+      ty = Lambda Rn.Value $ Lambda Rn.Value Rn.Value
   runExceptT $ runRn $ do
     addType uname ty
     addVariable name uname
@@ -127,7 +127,7 @@ interpret str = do
     Left _ -> do
       let expr_ps = runParser parseExpression () "<interactive>" str
       case expr_ps of
-        Left err -> return $ ErrorI $ L mempty $ show err
+        Left err -> return $ ErrorI $ convertParsecError err
         Right expr_ps -> interpretExpr expr_ps
 
 interpretExpr :: LCalcExpr CalcPs -> Calculator Interpret
@@ -198,3 +198,23 @@ runRn rn = do
 
 runTc :: Tc a -> ECalculator a
 runTc = runRn
+
+
+
+convertParsecError :: ParseError -> Located String
+convertParsecError err =
+  let pos = errorPos err
+      column = sourceColumn pos
+      msgs = errorMessages err
+      (_, msgs1) = span (SysUnExpect "" ==) msgs
+      (_, msgs2) = span (UnExpect "" ==) msgs1
+      (expect, _) = span (Expect "" ==) msgs2
+
+      commasOr [] = ""
+      commasOr [m] = m
+      commasOr ms = commaSep (init ms) ++ " or " ++ last ms
+
+      commaSep [] = ""
+      commaSep [m] = m
+      commaSep (m : ms) = m ++ ", " ++ commaSep ms
+  in L (SrcSpan column $ column + 1) $ "expected " ++ commasOr (fmap messageString expect)
