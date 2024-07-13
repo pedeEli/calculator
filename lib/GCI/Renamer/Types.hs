@@ -22,15 +22,18 @@ type Tc = Rn
 data RnState = RnState {
   glbState :: GlbState,
   lclState :: LclState}
+  deriving (Show)
 
 data GlbState = GlbState {
   unique_counter :: Word64,
   fixities :: Map Unique Fixity,
   types :: Map Unique LType,
   unique_map :: Map String Unique}
+  deriving (Show)
 
 newtype LclState = LclState {
   names :: Map String Unique}
+  deriving (Show)
 
 newtype Fixity = Fixity Int
   deriving (Show, Eq, Ord)

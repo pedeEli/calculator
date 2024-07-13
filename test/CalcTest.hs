@@ -3,19 +3,20 @@
 module Main (main) where
 
 import Test.Tasty
-import Test.Tasty.Providers (singleTest)
-import Test.QuickCheck.Monadic (monadicIO, run, assert)
-import Test.Tasty.QuickCheck (QC(QC))
+import Test.Tasty.Providers
+import Test.QuickCheck.Monadic as M
+import Test.Tasty.QuickCheck
 import Test.QuickCheck
 
-import Calc (calc)
-import Calc.Value (showRational)
+import Utils
 
-import Utils (testCalc, convertToRational)
+import GCI.Types.Value as V
+
+import GCI.Calculator
+
 
 main :: IO ()
 main = defaultMain tests
-
 
 tests :: TestTree
 tests = testGroup "Tests" [withoutUnits, withUnits, unitConversion, unitCast]

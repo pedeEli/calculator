@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, TypeApplications, FlexibleContexts, GADTs #-}
+{-# LANGUAGE ScopedTypeVariables, FlexibleContexts, GADTs, FlexibleInstances #-}
 module GCI.Calculator where
 
 
@@ -28,7 +28,7 @@ import GCI.Renamer.Decl
 import GCI.Typechecker.Expr
 import GCI.Typechecker.Decl
 
-import GCI.Types.Names 
+import GCI.Types.Names
 import GCI.Types.SrcLoc
 import GCI.Types.Value as V
 
@@ -43,6 +43,10 @@ data CState = CState {
   variables :: Map Unique Expr,
   build_ins :: Map Unique (ECalculator Value),
   strip_override :: Bool}
+  deriving (Show)
+
+instance {-# OVERLAPS #-} Show (ECalculator Value) where
+  show _ = "ECalculator Value"
 
 
 getVariable :: Unique -> ECalculator Expr
@@ -56,7 +60,7 @@ setVariable :: Unique -> Expr -> Calculator ()
 setVariable uname exp = modify $ \s -> s {
   variables = M.insert uname exp $ variables s}
 
-startCalculator :: Calculator () -> IO ()
+startCalculator :: Calculator a -> IO a
 startCalculator calc = evalStateT calc $ CState {
   strip_override = True,
   rn_state = defaultState,
@@ -77,6 +81,7 @@ addBuildIn1 name f = do
   runExceptT $ runRn $ do
     addType uname ty
     addVariable name uname
+  setVariable uname exp
   modify $ \s -> s {build_ins = M.insert uname g $ build_ins s}
 
 addBuildIn2 :: String -> Int -> (Value -> Value -> ExceptT (Located String) Calculator Value) -> Calculator ()
@@ -89,7 +94,7 @@ addBuildIn2 name fix f = do
         b_exp <- getVariable arg2
         ValR a_val <- evaluate a_exp
         ValR b_val <- evaluate b_exp
-        f a_val b_val
+        f b_val a_val
       exp = Lam arg1 $ Lam arg2 $ BuildIn uname
       ty = L mempty $ Lambda (L mempty Rn.Value) $ L mempty $ Lambda (L mempty Rn.Value) $ L mempty Rn.Value
   runExceptT $ runRn $ do
@@ -166,10 +171,11 @@ evaluate (App left right) = do
   evaluate exp
 evaluate (Cast exp cast) = do
   exp_result <- evaluate exp
+  lift $ modify $ \s -> s {strip_override = False}
   cast_result <- evaluate cast
   case (exp_result, cast_result) of
     (ValR exp_value, ValR cast_value) -> do
-      when (unitsEqual exp_value cast_value) $
+      unless (unitsEqual exp_value cast_value) $
         throwE $ L mempty "missmatched units in cast"
       return $ ValR $ castValue exp_value cast_value
     _ -> throwE $ L mempty "cannot cast a lambda expression"
@@ -189,6 +195,6 @@ runRn rn = do
     (Right a, rns') -> do
       lift $ put $ state {rn_state = rns'}
       return a
-    
+
 runTc :: Tc a -> ECalculator a
 runTc = runRn

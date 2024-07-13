@@ -19,7 +19,7 @@ import GCI.Parser.Lexer
 parseExpression :: Parsec String () (LCalcExpr CalcPs)
 parseExpression = do
   spaces
-  exp <- infixExp
+  exp <- expbase
   cast <- optionMaybe $ do
     open <- castOpen
     L _ cast <- castexp
@@ -31,22 +31,32 @@ parseExpression = do
     Just cast -> addCLoc exp cast $ CalcCast noExtField exp cast
 
 
-infixExp' :: Parsec String () (Located String) -> Parsec String () (LCalcExpr CalcPs) -> Parsec String () (LCalcExpr CalcPs)
-infixExp' operator exp = do
+infixExp' ::
+  Parsec String () (Located String) ->
+  Parsec String () (LCalcExpr CalcPs) ->
+  Parsec String () (LCalcExpr CalcPs) ->
+  Parsec String () (LCalcExpr CalcPs)
+infixExp' operator exp next = do
   exp1 <- exp
   result <- optionMaybe $ do
     op <- operator <* spaces
-    exp2 <- infixExp' operator exp
+    exp2 <- next
     return (op, exp2)
   return $ case result of
     Nothing -> exp1
     Just (op, exp2) -> mkCalcOpApp exp1 op exp2
 
-infixExp :: Parsec String () (Located (CalcExpr CalcPs))
-infixExp = infixExp' operator fexp
 
-fexp :: Parsec String () (LCalcExpr CalcPs)
-fexp = do
+expbase :: Parsec String () (LCalcExpr CalcPs)
+expbase = infixExp' operator fexpminus infixExp
+
+
+infixExp :: Parsec String () (LCalcExpr CalcPs)
+infixExp = infixExp' operator fexp infixExp
+
+
+fexpminus :: Parsec String () (LCalcExpr CalcPs)
+fexpminus = do
   minus <- optionMaybe $ located $ char '-' <* spaces
   exp1 <- aexp
   let exp1' = maybe exp1 (mkCalcNegApp exp1) minus
@@ -54,6 +64,14 @@ fexp = do
   return $ case result of
     Nothing -> exp1'
     Just exp2 -> mkCalcApp exp1' exp2
+
+fexp :: Parsec String () (LCalcExpr CalcPs)
+fexp = do
+  exp1 <- aexp
+  result <- optionMaybe fexp
+  return $ case result of
+    Nothing -> exp1
+    Just exp2 -> mkCalcApp exp1 exp2
 
 
 aexp :: Parsec String () (LCalcExpr CalcPs)
@@ -64,7 +82,7 @@ texp :: Parsec String () (LCalcExpr CalcPs)
 texp = do
   open <- bracketOpen
   spaces
-  exp <- infixExp
+  exp <- expbase
   close <- bracketClose
   spaces
   return $ addCLoc open close $ CalcPar noExtField exp
@@ -98,7 +116,7 @@ unit = do
 
 
 castexp :: Parsec String () (LCalcExpr CalcPs)
-castexp = infixExp' castop castaexp
+castexp = infixExp' castop castaexp castexp
 
 castop :: Parsec String () (Located String)
 castop = located $ string "*" <|> string "/"

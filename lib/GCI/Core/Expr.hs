@@ -34,7 +34,7 @@ simplify' (CalcLam _ left right) = Lam (unLoc left) (simplify right)
 simplify' (CalcApp _ left right) = App (simplify left) (simplify right)
 simplify' (CalcOpApp _ left op right) = App (App (Var $ unLoc op) $ simplify left) $ simplify right
 simplify' (CalcPar _ exp) = simplify exp
-simplify' (CalcCast _ exp cast) = simplify exp
+simplify' (CalcCast _ exp cast) = Cast (simplify exp) (simplify cast)
 
 
 simplifyLit :: CalcLit CalcTc -> Expr

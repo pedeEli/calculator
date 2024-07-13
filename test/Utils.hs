@@ -1,88 +1,70 @@
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NamedFieldPuns, TemplateHaskell #-}
 module Utils where
 
 
-import Language.Haskell.TH hiding (conE, litE, varE, varP, conT, conP)
-import qualified Language.Haskell.TH as TH (conE, litE, varE, varP, conT, conP)
+import Language.Haskell.TH
+
+import Test.QuickCheck.Monadic as M
 
 import Test.Tasty (TestName)
 
-import Data.Maybe (isNothing)
-import Data.List (nub, singleton, find)
+import Data.Maybe
+import Data.List
 import Data.Bifunctor (Bifunctor(second))
 
 import Text.Parsec
 
 import Control.Lens
 
-import Calc.Token (number)
+import GCI.Parser.Lexer
+
+import GCI.Types.SrcLoc
+import GCI.Types.Value as V
+import GCI.Calculator
+
+runC :: String -> IO Interpret
+runC str = startCalculator $ do
+  addBuildIn2 "+" 0 (<<+>>)
+  addBuildIn2 "-" 0 (<<->>)
+  addBuildIn2 "*" 1 (<<*>>)
+  addBuildIn2 "/" 1 (<</>>)
+  addBuildIn2 "^" 2 (<<^>>)
+  addBuildIn1 "negate" V.negate
+  interpret str
 
 
 testCalc :: String -> ExpQ -> String -> ExpQ
 testCalc str f unit = do
   (vars, strings) <- parseExpr str
   let args = map createArg $ nub vars
-      nameE = litE $ createName vars strings
-      singleTestE = appE (varE "singleTest") nameE
+      name = createName vars strings
 
-  singleTestE $: conE "QC" $: varE "property" $: lamE args $ caseE (varE "calc" $: createCalc vars strings) [
-      match (conP "Left" [varP "_"]) (normalB $ conE "False") [],
-      match (conP "Right" [varP "value"]) (
-        normalB $ showE (varE "value") ==: appE (varE "showRational") (apply f vars) ++: litE unit
-      ) []
-    ]
+  [| singleTest name $ QC $ property $ $(lamE args [| monadicIO $ do
+    result <- M.run $ runC $ $(createCalc vars strings)
+    case result of
+      ValI str -> assert $ str == V.showRational ($(apply f vars)) ++ unit
+      _ -> assert False |]) |]
 
   where
-    showE = appE (varE "show")
-    typed v = sigE (varE [vName v]) (conT "Double")
+    typed v = [| $(varE $ mkName [vName v]) :: Double |]
 
     createArg :: Variable -> PatQ
     createArg v = case vMod v of
-      Nothing -> varP [vName v]
-      Just mod -> conP mod [varP [vName v]]
+      Nothing ->  varP $ mkName [vName v]
+      Just mod -> conP (mkName mod) [varP $ mkName [vName v]]
 
     createName :: [Variable] -> [String] -> String
     createName [] bs = concat bs
     createName (v : vs) (b : bs) = b ++ [vName v] ++ createName vs bs
 
     createCalc :: [Variable] -> [String] -> ExpQ
-    createCalc [] bs = litE $ concat bs
-    createCalc (v : vs) (b : bs) = litE b ++: showE (typed v) ++: createCalc vs bs
+    createCalc [] bs = litE $ stringL $ concat bs
+    createCalc (v : vs) (b : bs) = [| $(litE $ stringL b) ++ show $(typed v) ++ $(createCalc vs bs) |]
 
     apply :: ExpQ -> [Variable] -> ExpQ
     apply f [] = f
-    apply f (v : vs) = apply (appE f $ appE (varE "convertToRational") $ varE [vName v]) vs
+    apply f (v : vs) = apply [| $(f) (convertToRational $(varE $ mkName [vName v])) |] vs
 
-
--- utils ---------------------------------------
-($:) :: Quote m => m Exp -> m Exp -> m Exp
-e1 $: e2 = uInfixE e1 (varE "$") e2
-infixr 0 $:
-(++:) :: Quote m => m Exp -> m Exp -> m Exp
-e1 ++: e2 = uInfixE e1 (varE "++") e2
-infixr 5 ++:
-(==:) :: Quote m => m Exp -> m Exp -> m Exp
-e1 ==: e2 = uInfixE e1 (varE "==") e2
-infix 4 ==:
-
-
-conE :: Quote m => String -> m Exp
-conE = TH.conE . mkName
-
-varE :: Quote m => String -> m Exp
-varE = TH.varE . mkName
-
-litE :: Quote m => String -> m Exp
-litE = TH.litE . stringL
-
-varP :: Quote m => String -> m Pat
-varP = TH.varP . mkName
-
-conT :: Quote m => String -> m Type
-conT = TH.conT . mkName
-
-conP :: Quote m => String -> [m Pat] -> m Pat
-conP = TH.conP . mkName
 
 
 convertToRational :: Double -> Rational
@@ -90,8 +72,9 @@ convertToRational = go . show
   where
     go :: String -> Rational
     go ('-' : rest) = -1 * go rest
-    go rest = runParser number () "" rest ^?! _Right
-
+    go rest =
+      let Right v = runParser value () "" rest
+      in unLoc v
 
 data Variable = Variable {vName :: Char, vMod :: Maybe String}
   deriving (Show, Eq)
