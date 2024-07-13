@@ -12,7 +12,7 @@ instance Show SrcSpan where
 data Located e = L {getLoc :: SrcSpan, unLoc :: e}
   deriving (Functor, Eq)
 instance Show e => Show (Located e) where
-  show (L loc e) = show loc ++ ": " ++ show e
+  show (L _ e) = show e
 
 
 instance Semigroup SrcSpan where
