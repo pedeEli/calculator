@@ -15,7 +15,7 @@ type instance XXLit (CalcPass _) = DataConCantHappen
 
 instance {-# OVERLAPS #-} Show (CalcLit (CalcPass p)) where
   show (CalcRational _ r) = show r
-  show (CalcUnit _ u e) = case e of
-    Nothing -> u
-    Just e -> u ++ "^" ++ show e
+  show (CalcUnit _ str _ _ e) = case e of
+    Nothing -> str
+    Just e -> str ++ "^" ++ show e
   show (XLit p) = show p

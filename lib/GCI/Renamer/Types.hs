@@ -14,7 +14,6 @@ import GCI.Types.Names
 import Data.Word
 import Data.Map as M
 import Data.Maybe
-import Debug.Trace (traceM)
 
 
 type Rn = ExceptT String (State RnState)
@@ -63,13 +62,15 @@ defaultState = RnState {
       (Unique "-" 1, Lambda Value $ Lambda Value Value),
       (Unique "*" 2, Lambda Value $ Lambda Value Value),
       (Unique "/" 3, Lambda Value $ Lambda Value Value),
-      (Unique "^" 4, Lambda Value $ Lambda Value Value)],
+      (Unique "^" 4, Lambda Value $ Lambda Value Value),
+      (Unique "negate" 5, Lambda Value Value)],
     unique_map = M.fromList [
       ("+", Unique "+" 0),
       ("-", Unique "-" 1),
       ("*", Unique "*" 2),
       ("/", Unique "/" 3),
-      ("^", Unique "^" 4)]}}
+      ("^", Unique "^" 4),
+      ("negate", Unique "negate" 5)]}}
 
 
 mkUniqueName :: String -> Rn Unique
@@ -141,6 +142,14 @@ addType uname ty = do
       tys = types glbs
   lift $ put $ s {glbState = glbs {
     types = M.insert uname ty tys}}
+
+addVariable :: String -> Unique -> Rn ()
+addVariable name uname = do
+  s <- lift get
+  let glbs = glbState s
+      um = unique_map glbs
+  lift $ put $ s {glbState = glbs {
+    unique_map = M.insert name uname um}}
 
 
 reportError :: String -> Rn a

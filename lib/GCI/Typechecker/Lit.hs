@@ -15,4 +15,4 @@ import GCI.Types.SrcLoc
 
 typecheckLit :: CalcLit CalcRn -> Tc (CalcLit CalcTc)
 typecheckLit (CalcRational _ r) = return $ CalcRational noExtField r
-typecheckLit (CalcUnit _ u e) = return $ CalcUnit noExtField u e
+typecheckLit (CalcUnit _ str u r e) = return $ CalcUnit noExtField str u r e

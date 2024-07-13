@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Calc.UnitCreation where
+module GCI.Types.UnitCreation where
 
 
 import Data.Ratio

@@ -1,16 +1,14 @@
 {-# LANGUAGE RecordWildCards, TemplateHaskell, TupleSections, ScopedTypeVariables,
     TypeFamilies, OverloadedLists, FlexibleInstances #-}
 {-# OPTIONS_GHC -ddump-splices #-}
-module Calc.Unit where
+module GCI.Types.Unit where
+
 
 import GHC.Exts
-import Text.Parsec
 
 import Data.List
 
-import Control.Lens
-
-import Calc.UnitCreation
+import GCI.Types.UnitCreation
 
 
 data SIUnit = Mass | Length | Time
@@ -25,12 +23,16 @@ instance Show SIUnit where
 type UnitList a = [(a, Integer)]
 newtype Unit a = Unit (UnitList a)
 
-$(makePrisms 'Unit)
-
 instance IsList (Unit a) where
   type Item (Unit a) = (a, Integer)
   fromList = Unit
-  toList = view _Unit
+  toList (Unit ul) = ul
+
+mapExp :: (Integer -> Integer) -> Unit a -> Unit a
+mapExp f (Unit ul) = Unit $ mapExp' f ul
+
+mapExp' :: (Integer -> Integer) -> UnitList a -> UnitList a
+mapExp' f = map $ fmap f
 
 
 $(createDecs [
@@ -56,16 +58,16 @@ instance Show (Unit String) where
   show (Unit ul) = showUnitList id ul
 
 instance Show (Unit SIUnit) where
-  show us = case find (\a -> us == a ^. _2 && 1 == a ^. _3) composedUnits of
+  show us = case find (\(_, u, r) -> us == u && 1 == r) composedUnits of
     Just (symbol, _, _) -> " " ++ symbol
-    Nothing -> showUnitList show (us ^. _Unit)
+    Nothing -> showUnitList show (toList us)
 
 showUnitList :: forall a. Ord a => (a -> String) -> UnitList a -> String
 showUnitList toString ul = case splitAt0 ul of
   ([] , [])  -> ""
   (pos, [])  -> " " ++ go pos
-  ([] , neg) -> " 1/" ++ go (map (_2 *~ -1) neg)
-  (pos, neg) -> " " ++ go pos ++ "/" ++ go (map (_2 *~ -1) neg)
+  ([] , neg) -> " 1/" ++ go (mapExp' negate neg)
+  (pos, neg) -> " " ++ go pos ++ "/" ++ go (mapExp' negate neg)
   where
     go :: UnitList a -> String
     go [] = ""
@@ -73,9 +75,15 @@ showUnitList toString ul = case splitAt0 ul of
       | e == 1 = toString u ++ go us
       | otherwise = toString u ++ "^" ++ show e ++ go us
 
-splitAt0 :: Ord a => UnitList a -> (UnitList a, UnitList a)
-splitAt0 = (both %~ sort) . foldl (\r u -> r & getLens u %~ (u :)) ([], [])
-  where getLens u = if snd u > 0 then _1 else _2
+splitAt0 :: forall a. Ord a => UnitList a -> (UnitList a, UnitList a)
+splitAt0 = sort' . foldl f ([], [])
+  where
+    sort' :: (UnitList a, UnitList a) -> (UnitList a, UnitList a)
+    sort' (pos, neg) = (sort pos, sort neg)
+    f :: (UnitList a, UnitList a) -> (a, Integer) -> (UnitList a, UnitList a)
+    f (pos, neg) (a, e)
+      | e < 0     = (pos, (a, e) : neg)
+      | otherwise = ((a, e) : pos, neg)
 
 instance Ord a => Eq (Unit a) where
   Unit ul1 == Unit ul2
@@ -92,12 +100,16 @@ multiply (Unit u1) (Unit u2) = Unit $ filter ((0 /=) . snd) $ go (u1 ++ u2) []
   where
     go :: UnitList a -> UnitList a -> UnitList a
     go [] acc = acc
-    go ((u, e) : us) acc = case findIndex ((u ==) . view _1) acc of
-      Nothing -> go us ((u, e) : acc)
-      Just i -> go us $ acc & ix i . _2 +~ e
+    go ((u, e) : us) acc = go us $ f u e acc
+
+    f :: a -> Integer -> UnitList a -> UnitList a
+    f u e [] = [(u, e)]
+    f u e ((u', e') : us) = if u == u'
+      then (u', e' + e) : us
+      else (u', e') : f u e us
 
 divide :: Eq a => Unit a -> Unit a -> Unit a
-divide u1 u2 = multiply u1 $ u2 & _Unit . mapped . _2 *~ -1
+divide u1 u2 = multiply u1 $ mapExp negate u2
 
 
 

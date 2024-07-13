@@ -1,11 +1,6 @@
 module GCI.Parser.Lexer where
 
 
-import qualified Calc.Value as V
-import qualified Calc.Unit as U
-import qualified Calc.Calculator as C
-import qualified Calc.Error as E
-
 import Text.Parsec
 
 import Control.Monad
@@ -13,8 +8,7 @@ import Control.Monad
 import Data.Ratio
 
 import GCI.Types.SrcLoc
-
-
+import GCI.Types.Unit
 
 
 located :: Parsec String () a -> Parsec String () (Located a)
@@ -73,8 +67,8 @@ value = located $ do
         then 1 % (10 ^ read digits)
         else (10 ^ read digits) % 1
 
-singleUnit :: Parsec String () (Located (String, Maybe Int))
+singleUnit :: Parsec String () (Located (String, Unit SIUnit, Rational, Maybe Integer))
 singleUnit = located $ do
-  u <- choice $ map (\(str, _, _) -> try (string str)) U.allUnits
+  (str, u, r) <- choice $ map (\(str, u, r) -> try (string str) >> return (str, u, r)) allUnits
   e <- optionMaybe $ char '^' >> read <$> many1 digit
-  return (u, e)
+  return (str, u, r, e)

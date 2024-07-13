@@ -2,6 +2,7 @@ module GCI.Typechecker.Expr where
 
 
 import Data.Maybe
+import Data.Foldable
 
 import Language.Calc.Syntax.Expr
 import Language.Calc.Syntax.Lit
@@ -16,7 +17,6 @@ import GCI.Typechecker.Lit
 
 import GCI.Types.SrcLoc
 import GCI.Types.Names
-import Debug.Trace (traceM)
 
 
 typecheckExpression :: LCalcExpr CalcRn -> Tc (LCalcExpr CalcTc)
@@ -110,15 +110,19 @@ applyType (Variable a) r = do
   addType return_type_name return_type
   addType a ty
   return return_type
-applyType (Lambda (Variable a) r1) r2 = do
-  addType a r2
-  return $ applyVariable a r2 r1
-applyType (Lambda l r) (Variable a) = do
-  addType a l
-  return r
-applyType (Lambda l r1) r2 = if l == r2
-  then return r1
-  else reportError "unmatching type"
+applyType (Lambda arg right) app = do
+  eqs <- typesEqual arg app
+  traverse_ (uncurry addType) eqs
+  return $ foldr (uncurry applyVariable) right eqs
 
 
--- test x y = x y
+typesEqual :: Type -> Type -> Tc [(Unique, Type)]
+typesEqual Value Value = return []
+typesEqual Value (Variable uname) = return [(uname, Value)]
+typesEqual Value _ = reportError "missmatching types"
+typesEqual (Variable uname) ty = return [(uname, ty)]
+typesEqual (Lambda ty1_1 ty1_2) (Lambda ty2_1 ty2_2) = do
+  eqs1 <- typesEqual ty1_1 ty2_1
+  eqs2 <- typesEqual ty1_2 ty2_2
+  return $ eqs1 ++ eqs2
+typesEqual (Lambda _ _) _ = reportError "missmatching types" 

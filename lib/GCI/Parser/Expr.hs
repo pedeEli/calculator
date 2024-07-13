@@ -93,8 +93,8 @@ units = do
 
 unit :: Parsec String () (LCalcExpr CalcPs)
 unit = do
-  L loc (u, e) <- singleUnit <?> "unit"
-  return $ L loc $ CalcLit noExtField $ CalcUnit noExtField u e
+  L loc (str, u, r, e) <- singleUnit <?> "unit"
+  return $ L loc $ CalcLit noExtField $ CalcUnit noExtField str u r e
 
 
 castexp :: Parsec String () (LCalcExpr CalcPs)

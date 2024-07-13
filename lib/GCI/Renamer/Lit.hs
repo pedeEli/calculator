@@ -15,4 +15,4 @@ import GCI.Types.SrcLoc
 
 renameLit :: CalcLit CalcPs -> Rn (CalcLit CalcRn)
 renameLit (CalcRational _ r) = return $ CalcRational noExtField r
-renameLit (CalcUnit _ u e) = return $ CalcUnit noExtField u e
+renameLit (CalcUnit _ str u r e) = return $ CalcUnit noExtField str u r e

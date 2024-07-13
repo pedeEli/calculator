@@ -4,10 +4,12 @@ module Language.Calc.Syntax.Lit where
 
 import Language.Calc.Syntax.Extension
 
+import GCI.Types.Unit
+
 
 data CalcLit p =
   CalcRational (XCalcVal p) Rational |
-  CalcUnit (XCalcUnit p) String (Maybe Int) |
+  CalcUnit (XCalcUnit p) String (Unit SIUnit) Rational (Maybe Integer) |
   XLit (XXLit p)
 
 deriving instance (

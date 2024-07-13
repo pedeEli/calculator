@@ -1,18 +1,20 @@
 module Main where
 
-import Calc
+import GCI.Calculator
+import Control.Monad.IO.Class
 
 main :: IO ()
 main = do
   putStrLn "Rechner"
---   runCalculator loop
+  startCalculator loop
 
 
-
--- loop :: Calculator () ()
--- loop = do
---   line <- liftIO getLine
---   result <- calc line
---   case result of
---     Left err -> liftIO (print err) >> loop
---     Right d -> liftIO (print d) >> loop
+loop :: Calculator ()
+loop = do
+  str <- liftIO getLine
+  result <- interpret str
+  case result of
+    Nothing -> loop
+    Just s -> do
+      liftIO $ putStrLn s
+      loop

@@ -13,6 +13,7 @@ import GCI.Renamer.Types
 import GCI.Typechecker.Expr
 
 import GCI.Types.SrcLoc
+import GCI.Types.Names
 
 
 typecheckDeclaration :: LCalcDecl CalcRn -> Tc (LCalcDecl CalcTc)
@@ -21,4 +22,5 @@ typecheckDeclaration (L loc (ValD _ lname exp_rn)) = do
   let uname = unLoc lname
       ty = calcExprType $ unLoc exp_tc
   addType uname ty
+  addVariable (unique_name uname) uname
   return $ L loc $ ValD ty lname exp_tc

@@ -21,12 +21,8 @@ extra-source-files: CHANGELOG.md
 
 library
     exposed-modules:
-        Calc,
         Calc.Token,
-        Calc.Unit,
-        Calc.Value,
         Calc.Error,
-        Calc.UnitCreation,
         Calc.Calculator,
 
         Language.Calc.Syntax.Expr,
@@ -49,13 +45,18 @@ library
 
         GCI.Types.SrcLoc,
         GCI.Types.Names,
+        GCI.Types.Unit,
+        GCI.Types.Value,
+        GCI.Types.UnitCreation,
 
         GCI.Calc.Expr,
         GCI.Calc.Decl,
         GCI.Calc.Lit,
         GCI.Calc.Extension,
 
-        GCI.Test
+        GCI.Core.Expr,
+
+        GCI.Calculator
 
     -- Modules included in this library but not exported.
     -- other-modules:

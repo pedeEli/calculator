@@ -3,7 +3,7 @@
 {-# OPTIONS_GHC -Wall #-}
 module Calc.Calculator where
 
-
+{-
 import Control.Lens
 import Control.Monad.Trans.Except
 import qualified Control.Monad.Trans.State as S
@@ -230,3 +230,5 @@ variableToValue (Value _ expr) = expr >>= evaluate
 variableToLambda :: Variable -> Calculator () (E.Position, String, Variable)
 variableToLambda (Value pos _) = throwString pos "expected a function"
 variableToLambda (Lambda pos name variable) = return (pos, name, variable)
+
+-}

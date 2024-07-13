@@ -50,7 +50,7 @@ renameApp :: LCalcExpr CalcPs -> LCalcExpr CalcPs -> Rn (CalcExpr CalcRn)
 renameApp left_ps right_ps = do
   left_rn <- renameExpression left_ps
   right_rn <- renameExpression right_ps
-  return $ CalcApp noExtField left_rn right_rn
+  return $ mkApp left_rn right_rn
 
 renameOpApp :: LCalcExpr CalcPs -> LIdP CalcPs -> LCalcExpr CalcPs -> Rn (CalcExpr CalcRn)
 renameOpApp left_ps op_ps right_ps = do
@@ -82,3 +82,8 @@ mkOpApp fix1 e1 op1 e2@(L _ (CalcOpApp fix2 e2_1 op2 e2_2))
   | fix2 > fix1 = CalcOpApp fix1 e1 op1 e2
   | otherwise   = CalcOpApp fix2 (addCLoc e1 e2_1 $ CalcOpApp fix1 e1 op1 e2_1) op2 e2_2
 mkOpApp fix1 e1 op e2 = CalcOpApp fix1 e1 op e2
+
+
+mkApp :: LCalcExpr CalcRn -> LCalcExpr CalcRn -> CalcExpr CalcRn
+mkApp e1 (L _ (CalcApp _ e2 e3)) = CalcApp noExtField (addCLoc e1 e2 $ CalcApp noExtField e1 e2) e3
+mkApp e1 e2 = CalcApp noExtField e1 e2
